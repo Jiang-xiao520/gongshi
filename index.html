@@ -195,6 +195,7 @@ textarea{resize:vertical;min-height:60px}
   .filter-item{width:100%}
 }
 </style>
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -228,9 +229,6 @@ function getYM(d){const x=d?new Date(d):new Date();return x.getFullYear()+'-'+(x
 function monthDays(y,m){return new Date(y,m,0).getDate()}
 function isWeekend(ds){const d=new Date(ds);return d.getDay()===0||d.getDay()===6}
 function randPick(a){return a[Math.floor(Math.random()*a.length)]}
-function uid(){
-  return Date.now()*1000+Math.floor(Math.random()*1000);
-}
 function toast(msg,type='info'){const el=document.createElement('div');el.className='toast '+type;el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3000)}
 function gup(k){return new URLSearchParams(location.search).get(k)}
 function handleSupaErr(txt){
@@ -289,7 +287,7 @@ window.deleteProject=async(id)=>{
 window.saveProject=async(id)=>{
   const b={party_a:$('mp_a').value.trim(),party_b:$('mp_b').value.trim(),project_name:$('mp_n').value.trim(),unit_price:parseFloat($('mp_p').value)||0,work_days_month:parseInt($('mp_d').value)||22};
   if(!b.party_a||!b.project_name){toast('请填写必填项','error');return}
-  try{if(id){await db.patch('projects',b,{id:'eq.'+id})}else{b.id=uid();await db.post('projects',b)}
+  try{if(id){await db.patch('projects',b,{id:'eq.'+id})}else{b.id=crypto.randomUUID();await db.post('projects',b)}
     closeModal('projModal');toast('保存成功','success');renderProjects();
   }catch(e){toast('保存失败：'+e.message,'error')}
 };
@@ -324,7 +322,7 @@ window.deleteRole=async(id)=>{if(!confirm('确定删除此角色？'))return;try
 window.saveRole=async(id)=>{
   const b={role_name:$('mr_name').value.trim(),quality_template:$('mr_q').value.trim(),efficiency_template:$('mr_e').value.trim(),attitude_template:$('mr_a').value,effect_template:$('mr_f').value.trim()};
   if(!b.role_name){toast('请填写角色名','error');return}
-  try{if(id){await db.patch('roles',b,{id:'eq.'+id})}else{b.id=uid();await db.post('roles',{...b,is_preset:false})}
+  try{if(id){await db.patch('roles',b,{id:'eq.'+id})}else{b.id=crypto.randomUUID();await db.post('roles',{...b,is_preset:false})}
     closeModal('roleModal');toast('保存成功','success');renderRoles();
   }catch(e){toast('保存失败：'+e.message,'error')}
 };
@@ -455,7 +453,7 @@ window.saveTimesheet=async()=>{
     const rows=[];const contents=[];
     document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
       const ds=tr.dataset.date;const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;const o=parseFloat(tr.querySelector('.ts-o').value)||0;const r=tr.querySelector('.ts-r').value.trim();
-      if(c){rows.push({id:uid(),employee_name:name,employee_role:role,project_id:projId,work_date:ds,content:c,hours:h,overtime_hours:o,remark:r});contents.push(c)}
+      if(c){rows.push({id:crypto.randomUUID(),employee_name:name,employee_role:role,project_id:projId,work_date:ds,content:c,hours:h,overtime_hours:o,remark:r});contents.push(c)}
     });
     if(rows.length>0){
       await db.post('timesheets',rows);
@@ -577,7 +575,7 @@ window.generateImpl=async()=>{
   const role=rolesCache.find(r=>r.role_name===emp.role);const tmpl=role||DEFAULT_TEMPLATE;
   const summary=smartCompress(contents.join('；'),500);
 
-  const implData={id:uid(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
+  const implData={id:crypto.randomUUID(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
 
   // Save
   try{await db.del('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month});
