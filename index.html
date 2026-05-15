@@ -229,6 +229,12 @@ function getYM(d){const x=d?new Date(d):new Date();return x.getFullYear()+'-'+(x
 function monthDays(y,m){return new Date(y,m,0).getDate()}
 function isWeekend(ds){const d=new Date(ds);return d.getDay()===0||d.getDay()===6}
 function randPick(a){return a[Math.floor(Math.random()*a.length)]}
+function uuid(){
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+    const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
 function toast(msg,type='info'){const el=document.createElement('div');el.className='toast '+type;el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3000)}
 function gup(k){return new URLSearchParams(location.search).get(k)}
 function handleSupaErr(txt){
@@ -287,7 +293,7 @@ window.deleteProject=async(id)=>{
 window.saveProject=async(id)=>{
   const b={party_a:$('mp_a').value.trim(),party_b:$('mp_b').value.trim(),project_name:$('mp_n').value.trim(),unit_price:parseFloat($('mp_p').value)||0,work_days_month:parseInt($('mp_d').value)||22};
   if(!b.party_a||!b.project_name){toast('请填写必填项','error');return}
-  try{if(id){await db.patch('projects',b,{id:'eq.'+id})}else{b.id=crypto.randomUUID();await db.post('projects',b)}
+  try{if(id){await db.patch('projects',b,{id:'eq.'+id})}else{b.id=uuid();await db.post('projects',b)}
     closeModal('projModal');toast('保存成功','success');renderProjects();
   }catch(e){toast('保存失败：'+e.message,'error')}
 };
@@ -322,7 +328,7 @@ window.deleteRole=async(id)=>{if(!confirm('确定删除此角色？'))return;try
 window.saveRole=async(id)=>{
   const b={role_name:$('mr_name').value.trim(),quality_template:$('mr_q').value.trim(),efficiency_template:$('mr_e').value.trim(),attitude_template:$('mr_a').value,effect_template:$('mr_f').value.trim()};
   if(!b.role_name){toast('请填写角色名','error');return}
-  try{if(id){await db.patch('roles',b,{id:'eq.'+id})}else{b.id=crypto.randomUUID();await db.post('roles',{...b,is_preset:false})}
+  try{if(id){await db.patch('roles',b,{id:'eq.'+id})}else{b.id=uuid();await db.post('roles',{...b,is_preset:false})}
     closeModal('roleModal');toast('保存成功','success');renderRoles();
   }catch(e){toast('保存失败：'+e.message,'error')}
 };
@@ -453,7 +459,7 @@ window.saveTimesheet=async()=>{
     const rows=[];const contents=[];
     document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
       const ds=tr.dataset.date;const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;const o=parseFloat(tr.querySelector('.ts-o').value)||0;const r=tr.querySelector('.ts-r').value.trim();
-      if(c){rows.push({id:crypto.randomUUID(),employee_name:name,employee_role:role,project_id:projId,work_date:ds,content:c,hours:h,overtime_hours:o,remark:r});contents.push(c)}
+      if(c){rows.push({id:uuid(),employee_name:name,employee_role:role,project_id:projId,work_date:ds,content:c,hours:h,overtime_hours:o,remark:r});contents.push(c)}
     });
     if(rows.length>0){
       await db.post('timesheets',rows);
@@ -473,7 +479,7 @@ window.saveTimesheet=async()=>{
 async function renderRecords(){
   const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
   try{
-    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});
+    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});const projNameMap={};projs.forEach(p=>projNameMap[p.id]=p.project_name);
     let mo='';for(let i=-6;i<=6;i++){const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}">${d.getFullYear()}年${d.getMonth()+1}月</option>`}
     wrap.innerHTML='<div class="card no-print"><div class="card-title">工时查看</div>'+
       '<div class="filter-bar"><div class="filter-item"><label>项目</label><select id="rec_proj"><option value="">全部</option>'+projs.map(p=>`<option value="${p.id}">${esc(p.project_name)}</option>`).join('')+'</select></div>'+
@@ -489,7 +495,7 @@ window.loadRecords=async(p=1)=>{
   try{
     const projId=$('rec_proj').value;const month=$('rec_month').value;const name=$('rec_name').value.trim();
     const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-    let q={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*,projects(project_name)',order:'work_date.desc,employee_name',limit:recPageSize.toString(),offset:((p-1)*recPageSize).toString()};
+    let q={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.desc,employee_name',limit:recPageSize.toString(),offset:((p-1)*recPageSize).toString()};
     if(projId)q.project_id='eq.'+projId;
     if(name)q.employee_name='ilike.*'+encodeURIComponent(name)+'*';
     const rows=await db.get('timesheets',q);
@@ -500,7 +506,7 @@ window.loadRecords=async(p=1)=>{
     const totalPages=Math.ceil(total/recPageSize)||1;
 
     const html='<div class="card"><table class="data-table"><thead><tr><th>日期</th><th>员工</th><th>角色</th><th>项目</th><th>工作内容</th><th>时长</th><th>加班</th></tr></thead><tbody>'+
-      (rows&&rows.length?rows.map(r=>`<tr><td>${r.work_date}</td><td>${esc(r.employee_name)}</td><td>${esc(r.employee_role)}</td><td>${esc(r.projects?.project_name||'')}</td><td class="cell-content">${esc(r.content)}</td><td>${r.hours}</td><td>${r.overtime_hours}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#999;padding:30px">暂无记录</td></tr>')+
+      (rows&&rows.length?rows.map(r=>`<tr><td>${r.work_date}</td><td>${esc(r.employee_name)}</td><td>${esc(r.employee_role)}</td><td>${esc(projNameMap[r.project_id]||'')}</td><td class="cell-content">${esc(r.content)}</td><td>${r.hours}</td><td>${r.overtime_hours}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#999;padding:30px">暂无记录</td></tr>')+
       '</tbody></table>'+(totalPages>1?renderPagination(p,totalPages,'loadRecords'):'')+'</div>';
     area.innerHTML=html;
   }catch(e){area.innerHTML='<div class="card">查询失败：'+esc(e.message)+'</div>'}
@@ -518,7 +524,7 @@ let implCache=null;
 async function renderImplement(){
   const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
   try{
-    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});
+    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});const projNameMap={};projs.forEach(p=>projNameMap[p.id]=p.project_name);
     let mo='';for(let i=-6;i<=6;i++){const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}" ${i===0?'selected':''}>${d.getFullYear()}年${d.getMonth()+1}月</option>`}
     wrap.innerHTML='<div class="card no-print"><div class="card-title">实施单生成</div>'+
       '<div class="filter-bar"><div class="filter-item"><label>项目<span class="required">*</span></label><select id="imp_proj">'+projs.map(p=>`<option value="${p.id}">${esc(p.project_name)}</option>`).join('')+'</select></div>'+
@@ -575,7 +581,7 @@ window.generateImpl=async()=>{
   const role=rolesCache.find(r=>r.role_name===emp.role);const tmpl=role||DEFAULT_TEMPLATE;
   const summary=smartCompress(contents.join('；'),500);
 
-  const implData={id:crypto.randomUUID(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
+  const implData={id:uuid(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
 
   // Save
   try{await db.del('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month});
