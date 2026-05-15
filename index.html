@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>工时填报与实施单系统</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+/* ===== Reset & Base ===== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#f5f5f5;color:#333;font-size:14px;line-height:1.5}
+a{color:#1890ff;text-decoration:none}
+input,select,textarea{font-family:inherit;font-size:14px}
+input[type="text"],input[type="number"],input[type="date"],input[type="search"],select,textarea{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:4px;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{border-color:#1890ff;box-shadow:0 0 0 2px rgba(24,144,255,.15)}
+textarea{resize:vertical;min-height:60px}
+
+/* ===== Buttons ===== */
+.btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;font-size:14px;cursor:pointer;transition:all .2s;text-align:center;white-space:nowrap}
+.btn:hover{opacity:.85;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:#1890ff;color:#fff}
+.btn-success{background:#52c41a;color:#fff}
+.btn-warning{background:#faad14;color:#fff}
+.btn-danger{background:#ff4d4f;color:#fff}
+.btn-default{background:#fff;color:#333;border:1px solid #d9d9d9}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-lg{padding:12px 28px;font-size:15px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* ===== Layout ===== */
+.container{max-width:1000px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;gap:8px}
+.card-title{font-size:16px;font-weight:600}
+.card-subtitle{font-size:12px;color:#999;margin-top:4px}
+
+/* ===== Form ===== */
+.form-row{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.form-col{flex:1;min-width:220px}
+.form-col-full{width:100%}
+.form-col-half{flex:0 0 calc(50% - 8px);min-width:220px}
+.form-label{display:block;margin-bottom:6px;font-weight:500;color:#555;font-size:13px}
+.form-label .required{color:#ff4d4f;margin-left:2px}
+.form-hint{font-size:12px;color:#999;margin-top:4px}
+
+/* ===== Table ===== */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{background:#fafafa;padding:10px 8px;text-align:left;font-weight:600;border-bottom:2px solid #f0f0f0;white-space:nowrap}
+.data-table td{padding:10px 8px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.data-table tr:hover td{background:#fafafa}
+.data-table .actions{display:flex;gap:6px;flex-wrap:wrap}
+.data-table .cell-content{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:768px){
+  .data-table{font-size:12px}
+  .data-table th,.data-table td{padding:8px 4px}
+  .data-table .cell-content{max-width:120px}
+}
+
+/* ===== Calendar Table (Timesheet) ===== */
+.cal-table{width:100%;border-collapse:collapse;font-size:13px}
+.cal-table th{background:#fafafa;padding:10px 6px;text-align:center;font-weight:600;border-bottom:2px solid #f0f0f0;position:sticky;top:0;z-index:10;font-size:12px}
+.cal-table td{padding:6px 4px;border-bottom:1px solid #f0f0f0;vertical-align:middle;text-align:center}
+.cal-table tr:hover td{background:#fafafa}
+.cal-table .weekend{background:#fff7e6}
+.cal-table .today{background:#e6f7ff;font-weight:600}
+.cal-table .day-num{width:40px;text-align:center;font-weight:500}
+.cal-table .day-week{width:36px}
+.cal-table input[type="text"],.cal-table input[type="number"]{border:none;padding:5px;background:transparent;text-align:center;width:100%;font-size:13px}
+.cal-table input[type="text"]{text-align:left}
+.cal-table input:focus{background:#fff;outline:1px solid #1890ff}
+.cal-table .content-cell{width:auto;text-align:left}
+.cal-table .content-cell input{text-align:left}
+
+/* ===== Stat Bar ===== */
+.stat-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid #1890ff;padding:12px 16px;display:flex;gap:20px;font-size:14px;box-shadow:0 -2px 8px rgba(0,0,0,.08);z-index:20;flex-wrap:wrap}
+.stat-item{display:flex;align-items:center;gap:6px}
+.stat-label{color:#666;font-size:13px}
+.stat-value{font-weight:700;color:#1890ff;font-size:16px}
+
+/* ===== Navigation ===== */
+.top-nav{background:#fff;border-bottom:1px solid #f0f0f0;position:sticky;top:0;z-index:100}
+.nav-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;padding:0 16px}
+.nav-brand{font-size:16px;font-weight:700;color:#1890ff;padding:12px 0;margin-right:20px;white-space:nowrap}
+.nav-links{display:flex;gap:0;overflow-x:auto;flex:1}
+.nav-link{padding:12px 14px;font-size:14px;color:#555;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.nav-link:hover{color:#1890ff;background:#f6fffe}
+.nav-link.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:600}
+@media(max-width:768px){
+  .nav-brand{font-size:14px;margin-right:10px}
+  .nav-link{padding:10px 10px;font-size:13px}
+}
+
+/* ===== Filters ===== */
+.filter-bar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end}
+.filter-item{flex:1;min-width:160px}
+.filter-item label{font-size:12px;color:#666;margin-bottom:4px;display:block}
+
+/* ===== Implement Sheet (Print) ===== */
+.sheet{background:#fff;padding:0;font-size:11pt}
+.sheet-title{text-align:center;font-size:17pt;font-weight:700;margin-bottom:12px;letter-spacing:2px}
+.sheet-subtitle{text-align:right;font-size:10pt;margin-bottom:8px;color:#333}
+.sheet-table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.sheet-table th,.sheet-table td{border:1px solid #000;padding:6px 8px;font-size:10pt;vertical-align:middle}
+.sheet-table th{background:#f5f5f5;font-weight:600;text-align:center}
+.sheet-table td input,.sheet-table td textarea,.sheet-table td select{width:100%;border:none;font-size:10pt;font-family:inherit;outline:none;resize:vertical;background:transparent}
+.sheet-table td input[readonly],.sheet-table td textarea[readonly]{background:#f9f9f9}
+.sheet-section-title{font-size:10pt;font-weight:600;margin:10px 0 4px}
+.sheet-sign-area{display:flex;gap:80px;margin-top:16px;align-items:center}
+.sheet-sign-box{display:flex;align-items:center;gap:6px;font-size:10pt}
+.sheet-sign-box img{max-width:120px;height:auto;border:1px solid #ccc}
+.sheet-sign-placeholder{width:120px;height:60px;border:1px solid #000;display:inline-flex;align-items:center;justify-content:center;color:#999;font-size:11px}
+.sheet-note{font-size:8pt;color:#666;margin-top:12px;text-align:center}
+.sheet-row-label{background:#f9f9f9;font-weight:600;text-align:center;white-space:nowrap}
+
+/* ===== Employee Cards (Implement Select) ===== */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.emp-card{background:#fff;border:2px solid #f0f0f0;border-radius:8px;padding:14px;cursor:pointer;transition:all .2s}
+.emp-card:hover{border-color:#1890ff;box-shadow:0 2px 8px rgba(24,144,255,.1)}
+.emp-card.selected{border-color:#1890ff;background:#e6f7ff}
+.emp-card .emp-name{font-weight:600;font-size:15px;margin-bottom:4px}
+.emp-card .emp-role{font-size:12px;color:#666;margin-bottom:6px}
+.emp-card .emp-stats{font-size:12px;color:#999;display:flex;gap:12px}
+
+/* ===== Toast ===== */
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:4px;color:#fff;font-size:14px;z-index:10000;animation:fadeIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.toast.success{background:#52c41a}
+.toast.error{background:#ff4d4f}
+.toast.info{background:#1890ff}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ===== Loading ===== */
+.loading{display:flex;align-items:center;justify-content:center;padding:50px;color:#999;font-size:14px}
+.spinner{width:20px;height:20px;border:2px solid #f3f3f3;border-top:2px solid #1890ff;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px;display:inline-block;vertical-align:middle}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+/* ===== Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-content{background:#fff;border-radius:8px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #f0f0f0}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{font-size:20px;color:#999;cursor:pointer;background:none;border:none;padding:0 4px}
+.modal-close:hover{color:#333}
+.modal-body{padding:20px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #f0f0f0}
+
+/* ===== Combobox ===== */
+.combobox-wrap{position:relative}
+.combobox-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d9d9d9;border-top:none;border-radius:0 0 4px 4px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.combobox-item{padding:8px 12px;cursor:pointer;font-size:13px}
+.combobox-item:hover,.combobox-item.active{background:#e6f7ff}
+.combobox-item mark{background:#fff3d5;font-weight:600}
+
+/* ===== Confirm Dialog ===== */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
+.confirm-box{background:#fff;border-radius:8px;width:100%;max-width:400px;padding:24px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.confirm-title{font-size:16px;font-weight:600;margin-bottom:12px}
+.confirm-text{color:#666;margin-bottom:20px;font-size:14px}
+.confirm-btns{display:flex;gap:12px;justify-content:center}
+
+/* ===== Pagination ===== */
+.pagination{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:16px;flex-wrap:wrap}
+.page-btn{padding:5px 11px;border:1px solid #d9d9d9;background:#fff;cursor:pointer;border-radius:4px;font-size:12px;transition:all .2s}
+.page-btn:hover{border-color:#1890ff;color:#1890ff}
+.page-btn.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.page-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ===== Tags ===== */
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:500}
+.tag-blue{background:#e6f7ff;color:#1890ff}
+.tag-green{background:#f6ffed;color:#52c41a}
+.tag-orange{background:#fff7e6;color:#fa8c16}
+
+/* ===== Print ===== */
+@media print{
+  body{background:#fff}
+  .no-print{display:none!important}
+  .card{box-shadow:none;padding:0;margin:0}
+  .container{max-width:100%;padding:0}
+  .sheet input,.sheet textarea,.sheet select{border:none!important;outline:none!important;background:transparent!important}
+  .sheet-table td,.sheet-table th{border:1px solid #000!important}
+  .stat-bar{display:none!important}
+  .top-nav{display:none!important}
+}
+
+/* ===== Responsive ===== */
+@media(max-width:768px){
+  .container{padding:8px}
+  .card{padding:12px}
+  .form-row{gap:10px}
+  .form-col,.form-col-half{min-width:100%;flex:0 0 100%}
+  .sheet-sign-area{gap:24px;flex-direction:column;align-items:flex-start}
+  .emp-grid{grid-template-columns:1fr}
+  .filter-bar{flex-direction:column}
+  .filter-item{width:100%}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ======== 配置 ========
+const SUPABASE_URL='https://xvtjkfepcjcsygmvmgqj.supabase.co/rest/v1';
+const SUPABASE_ANON_KEY='sb_publishable_jc5Z19SenS5EFZohtxyEOg_sjJZtaVa';
+const PARTY_B_SIGNATURE="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA5wAAAHWCAIAAACUjBGlAAA0bElEQVR42u3de7ScVX038O8h3AmEVBStQBJAERUStAiF0CTVNshlEbxUQNskCkq70IQCFl9REsUKiCWxoEvuaUXQWghXEVCIYIuISiIiKsrFG7VyiaIgl+T9Y79z3pNzmTPnnJlz5pnz+fyRlfXMM5fs2bOfne/s+e2u9evXpzqG/WoHveNAJwzpeFMepCn/3lHT1dU1vBOGdLwpDzKkE5p+RzBCNn2ErMQgyRhegFp9DdLn265LVK51hveCRzJ9HPNRu6268pBmdWMyo23dpNaMFiOkERLXoDGf1+rzA71HG//qV7/q4Pihif8BGs2b2rYHN30uOJo3NXduaoKLEXLkF+mmj5Au86azrb6a9Dyuz7dbr9jY56Txhhuo3wz7pmH0xWrNpeq/2tZNW4FRHgZbMXgO72ptiKCl1yB9vq3f8SpO8Ed/3Via9w1CB6yjHfbnqllLY0d/4YFRAyNkm4yQkcUy3CG6udcgfd6ktt2H7NEZtTusE4/wG//RnNGa1GJS2zEjpCs9jY/MLboG6fMmtR0YRQz7f2AVXQ/elHX6rZi5imlh3I6QrvdmsaN/DdLn261XmNRWbNQenZ7drDlcW81oTWoxqR23I6QZQKfOWcf8GqTPt1Wv6KruP3hMooi07FeNnTTajiQxHfa0VUwLFZ3XjrcRkg67Bunz7WMjTdDEydMIvxnvgMlTI/+KMZnRAmM+fhoh6chrkD7fRh2g0v8VGKsoYiT//erIxeAjX6rf6hmtmJZxqINHyMixGPoo3dIKX/q8Se2YDdlVGbXbtisPY6pXxRmtSS3jc1JbuRHS9d4sdmxntPp8m/SKrqo3Sqt34GjRqJ1R3ARo9MeOoT5Iq1cdiGkxrx2fI6Rr/3ibuY7yNUifb7deMX4ntWlSsdiR//dr3Ha+jMpvv8S0mNQaITEtbsU1SJ9vuze9A9quA0btjLPqB2a0YIQc6stzpae5Q3frfn+sz5vUtu+QnWZ8azAeOnGzhpI0rz6XSS102AjpSs/IR+zWlYDU501qjdpV7cqtWK1vRgvjc4SMn8vQBhegxq9B+rxJbTsO2ZUYtduhN498ntfE0aTVr9akFpPaMRkhU5Ef0VKtq08Trx0NbpOrz49Jr+jqmFZok1E7bbyItjzj6E/XmjgNNaMFI2R7NhFtO8C29Bqkz7dVr+jqpI9x5Ubtjh9Gm7jK1owWjJDQhtcgfb6N3nGT2tb1uXG7DLy5C/ZbMTaZ1GJSW60R0sWeFo3hTbkG6fMmtUbtjurHrVuzb0YLRkgXe1oxdDfxGqTPm9RWe9TOaC2Uac/3aHSmj60Ifc1oMa/tpBHS9d4stk2uQfr8mPcKk9pRGrVb0QVH571r+lSvRbHrqI1xYISsxAjp2m/mOprXIH2+HXpFV0f+49t21B7nI2zrJqlmtNAZI6RpKG0yRW7djmL6fAvf5U5tytHP9nXisRpKzGjBCAntc03R501q227IHrUe2alvQUt/Otbc0cekFpPadr5mu9gzaqN6cy8H+rxJbbVH7YzKjpSdN44M775mtDCuRkgXe1o3mLfuWqDPm9SO61G7Wv14rGaWZrRQ0RGyieOb671ZbFUuBPq8SW21u1Er2nZs369WfPLHajprRgtjfqH162/GdrgeyTI5fb4Ne0XXeGiIjhy1m/6MbbsftxktdPAIOVbXYxPfjp+wtuhJe95Rn2+7GYJJ7ag9lDF05ONXE8c+k1owQuIaNML76vPt9eaOkzZtk1F7PPfjtiq8ZUYLRkhcg5ryCPq8SW21R+2Ms5+Cjfn0sblzUDNaMEJiLtvcB9HnTWqN2h3bj9s2VTWjhcqNkC72VOKqoc+b1FZ71E4nljhon8li0x/TjBY6YIR0vWd0xvbhPaw+b1Jb7VG71b2tPd+jlk4QKzF...";
+
+const ATTITUDE_WORDS=["良好","积极主动","认真负责","团队协作好","沟通顺畅","响应及时","主动汇报进度","遇到问题主动求助","加班无怨言","乐于分享技术","主动优化流程","耐心解答问题","责任心强","执行力强","学习能力强","适应能力强","抗压能力强","细节把控到位","追求极致","用户导向","结果导向","主动承担","不推诿","守时守信","尊重规范","乐于接受反馈","持续改进","主人翁意识","服务意识","超出预期"];
+
+const ROLE_TEMPLATES={
+  "前端开发":{quality:"代码规范执行到位，命名、格式均符合团队编码标准，Code Review通过率较高。",efficiency:"需求响应及时，接到任务后能快速进入开发状态。",effect:"负责的核心系统上线后运行平稳，未发生重大生产故障。"},
+  "产品经理":{quality:"提测前会进行充分的自测，基础功能缺陷较少流入测试环节。",efficiency:"工期评估较为准确，实际交付与计划偏差较小，延期情况较少。",effect:"接口性能优化成果显著，部分慢查询响应时间大幅缩短。"},
+  "测试":{quality:"接口文档编写详尽，参数定义、返回值说明及异常场景覆盖完整，便于协作方快速对接。",efficiency:"线上问题响应速度快，故障处理时效性高。",effect:"所负责模块线上故障率较低，系统可用性指标表现良好。"},
+  "ABAP开发":{quality:"线上故障率控制良好，所负责模块近期未出现严重生产事故。",efficiency:"每日工作同步及时，遇到阻塞问题会主动上报，风险暴露较早。",effect:"技术方案落地顺利，从设计到上线各环节执行到位。"},
+  "安卓开发":{quality:"关键业务逻辑均配有清晰注释，代码可读性较强，降低了后续维护成本。",efficiency:"前后端联调配合积极，对接时段 availability 较好。",effect:"遗留系统重构取得实质进展，代码复杂度降低，可维护性提升。"},
+  "后端开发":{quality:"空指针、数组越界等基础异常处理严谨，运行时稳定性表现良好。",efficiency:"Code Review反馈处理效率高，问题修复周期短。",effect:"引入的新技术或工具在团队内推广效果较好，开发效率有所提升。"},
+  "Java开发":{quality:"数据库查询语句编写规范，复杂场景会评估执行计划，未出现影响系统性能的严重慢查询。",efficiency:"发布部署操作熟练，上线流程执行顺畅。",effect:"自动化工具开发减少了团队重复劳动，数据处理效率提升明显。"},
+  "UI设计":{quality:"核心业务流程均补充了单元测试，测试覆盖率满足团队基线要求。",efficiency:"问题定位能力较强，通过日志及堆栈分析可较快找到根因。",effect:"解决了多个历史性能瓶颈，高峰期系统稳定性增强。"},
+  "顾问":{quality:"分层架构遵循度较高，Controller、Service、DAO职责划分清晰，模块耦合度低。",efficiency:"业务理解能力较好，需求澄清次数少，开发方向把握准确。",effect:"数据迁移任务执行平稳，大规模数据量下零事故完成。"}
+};
+const DEFAULT_TEMPLATE={quality:"整体交付质量稳定，测试验收通过率较高，客户侧反馈问题较少。",efficiency:"多任务并行处理能力较好，同时推进多个需求时未出现遗漏。",effect:"项目交付客户认可度较高，验收通过率理想，后期变更需求较少。"};
+
+// ======== 工具函数 ========
+function $(id){return document.getElementById(id)}
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+function fmtDate(d){if(!d)return'';const x=new Date(d);return x.getFullYear()+'-'+(x.getMonth()+1).toString().padStart(2,'0')+'-'+x.getDate().toString().padStart(2,'0')}
+function getYM(d){const x=d?new Date(d):new Date();return x.getFullYear()+'-'+(x.getMonth()+1).toString().padStart(2,'0')}
+function monthDays(y,m){return new Date(y,m,0).getDate()}
+function isWeekend(ds){const d=new Date(ds);return d.getDay()===0||d.getDay()===6}
+function randPick(a){return a[Math.floor(Math.random()*a.length)]}
+function uid(){
+  return Date.now()*1000+Math.floor(Math.random()*1000);
+}
+function toast(msg,type='info'){const el=document.createElement('div');el.className='toast '+type;el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3000)}
+function gup(k){return new URLSearchParams(location.search).get(k)}
+function handleSupaErr(txt){
+  try{const j=JSON.parse(txt);if(j.code==='42501'||j.message?.includes('row-level security'))return '权限不足：请在Supabase控制台中为该表启用RLS策略（允许匿名用户读写）。';return j.message||j.error||txt}catch(e){return txt}
+}
+function sup(){
+  const h={'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+  return{async get(t,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{headers:h});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async post(t,b,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'POST',headers:h,body:JSON.stringify(b)});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async patch(t,b,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'PATCH',headers:h,body:JSON.stringify(b)});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async del(t,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'DELETE',headers:h});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return true}}
+}
+const db=sup();
+
+// ======== 全局状态 ========
+let currentPage=gup('page')||'timesheet';
+let projectsCache=[],rolesCache=[];
+
+// ======== 导航 ========
+const NAV_ITEMS=[{k:'projects',l:'项目管理'},{k:'roles',l:'角色管理'},{k:'timesheet',l:'工时填报'},{k:'records',l:'工时查看'},{k:'implement',l:'实施单'}];
+
+function renderNav(){
+  const el=$('app');
+  const nav=document.createElement('div');nav.className='top-nav no-print';
+  nav.innerHTML='<div class="nav-inner"><div class="nav-brand">工时系统</div><div class="nav-links">'+NAV_ITEMS.map(i=>`<div class="nav-link${i.k===currentPage?' active':''}" data-page="${i.k}">${i.l}</div>`).join('')+'</div></div>';
+  el.appendChild(nav);
+  nav.querySelectorAll('.nav-link').forEach(l=>l.addEventListener('click',()=>{currentPage=l.dataset.page;history.replaceState(null,'','?page='+currentPage);renderPage();}));
+}
+
+function renderContainer(){const wrap=document.createElement('div');wrap.id='pageWrap';wrap.className='container';wrap.style.paddingTop='8px';$('app').appendChild(wrap);}
+
+// ======== 页面1: 项目管理 ========
+async function renderProjects(){
+  const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    projectsCache=await db.get('projects',{select:'*',order:'created_at.desc'});
+    const html='<div class="card no-print"><div class="card-header"><div><div class="card-title">项目管理</div></div><button class="btn btn-primary" onclick="openProjectModal()">新增项目</button></div>'+
+      '<table class="data-table"><thead><tr><th>甲方</th><th>乙方</th><th>服务项目</th><th>单价(元/天)</th><th>应出勤天数</th><th class="no-print">操作</th></tr></thead><tbody>'+
+      projectsCache.map(p=>`<tr><td>${esc(p.party_a)}</td><td>${esc(p.party_b)}</td><td>${esc(p.project_name)}</td><td>${p.unit_price}</td><td>${p.work_days_month}</td><td class="actions no-print"><button class="btn btn-sm btn-default" onclick="editProject('${p.id}')">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteProject('${p.id}')">删除</button></td></tr>`).join('')+
+      '</tbody></table></div>';
+    wrap.innerHTML=html;
+  }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
+}
+function openProjectModal(id){
+  const p=id?projectsCache.find(x=>x.id===id):null;
+  const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='projModal';
+  overlay.innerHTML='<div class="modal-content"><div class="modal-header"><div class="modal-title">'+(p?'编辑':'新增')+'项目</div><button class="modal-close" onclick="closeModal(\'projModal\')">&times;</button></div><div class="modal-body">'+
+    '<div class="form-row"><div class="form-col"><label class="form-label">甲方<span class="required">*</span></label><input type="text" id="mp_a" value="'+(p?esc(p.party_a):'')+'"></div><div class="form-col"><label class="form-label">乙方</label><input type="text" id="mp_b" value="'+(p?esc(p.party_b):'柯莱特科技有限责任公司')+'"></div></div>'+
+    '<div class="form-row"><div class="form-col"><label class="form-label">服务项目<span class="required">*</span></label><input type="text" id="mp_n" value="'+(p?esc(p.project_name):'')+'"></div><div class="form-col"><label class="form-label">单价(元/人天)<span class="required">*</span></label><input type="number" id="mp_p" min="0" step="0.01" value="'+(p?p.unit_price:'')+'"></div></div>'+
+    '<div class="form-row"><div class="form-col"><label class="form-label">应出勤天数</label><input type="number" id="mp_d" min="1" max="31" value="'+(p?p.work_days_month:22)+'"></div></div>'+
+    '</div><div class="modal-footer"><button class="btn btn-default" onclick="closeModal(\'projModal\')">取消</button><button class="btn btn-primary" onclick="saveProject(\''+(id||'')+'\')">保存</button></div></div>';
+  document.body.appendChild(overlay);
+}
+window.editProject=(id)=>openProjectModal(id);
+window.deleteProject=async(id)=>{
+  if(!confirm('确定删除此项目？'))return;
+  try{await db.del('timesheets',{project_id:'eq.'+id});await db.del('projects',{id:'eq.'+id});toast('删除成功','success');renderProjects()}catch(e){toast('删除失败：'+e.message,'error')}
+};
+window.saveProject=async(id)=>{
+  const b={party_a:$('mp_a').value.trim(),party_b:$('mp_b').value.trim(),project_name:$('mp_n').value.trim(),unit_price:parseFloat($('mp_p').value)||0,work_days_month:parseInt($('mp_d').value)||22};
+  if(!b.party_a||!b.project_name){toast('请填写必填项','error');return}
+  try{if(id){await db.patch('projects',b,{id:'eq.'+id})}else{b.id=uid();await db.post('projects',b)}
+    closeModal('projModal');toast('保存成功','success');renderProjects();
+  }catch(e){toast('保存失败：'+e.message,'error')}
+};
+
+// ======== 页面2: 角色管理 ========
+async function renderRoles(){
+  const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    rolesCache=await db.get('roles',{select:'*',order:'created_at.desc'});
+    const html='<div class="card no-print"><div class="card-header"><div><div class="card-title">角色管理</div></div><button class="btn btn-primary" onclick="openRoleModal()">新增角色</button></div>'+
+      '<table class="data-table"><thead><tr><th>角色名</th><th>工作质量</th><th>工作效率</th><th>工作态度</th><th>工作效果</th><th class="no-print">操作</th></tr></thead><tbody>'+
+      rolesCache.map(r=>`<tr><td><span class="tag ${r.is_preset?'tag-blue':'tag-green'}">${esc(r.role_name)}</span></td><td class="cell-content" title="${esc(r.quality_template)}">${esc(r.quality_template)}</td><td class="cell-content" title="${esc(r.efficiency_template)}">${esc(r.efficiency_template)}</td><td>${esc(r.attitude_template)}</td><td class="cell-content" title="${esc(r.effect_template)}">${esc(r.effect_template)}</td><td class="actions no-print"><button class="btn btn-sm btn-default" onclick="editRole('${r.id}')">编辑</button>${r.is_preset?'':'<button class="btn btn-sm btn-danger" onclick="deleteRole(\''+r.id+'\')">删除</button>'}</td></tr>`).join('')+
+      '</tbody></table></div>';
+    wrap.innerHTML=html;
+  }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
+}
+function openRoleModal(id){
+  const r=id?rolesCache.find(x=>x.id===id):null;
+  const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='roleModal';
+  const attOpts=ATTITUDE_WORDS.map(w=>`<option value="${esc(w)}" ${r&&r.attitude_template===w?'selected':''}>${esc(w)}</option>`).join('');
+  overlay.innerHTML='<div class="modal-content"><div class="modal-header"><div class="modal-title">'+(r?'编辑':'新增')+'角色</div><button class="modal-close" onclick="closeModal(\'roleModal\')">&times;</button></div><div class="modal-body">'+
+    '<div class="form-row"><div class="form-col"><label class="form-label">角色名<span class="required">*</span></label><input type="text" id="mr_name" value="'+(r?esc(r.role_name):'')+'" '+(r&&r.is_preset?'readonly style="background:#f5f5f5"':'')+'></div></div>'+
+    '<div class="form-row"><div class="form-col-full"><label class="form-label">工作质量模板</label><textarea id="mr_q" rows="2">'+(r?esc(r.quality_template):'')+'</textarea></div></div>'+
+    '<div class="form-row"><div class="form-col-full"><label class="form-label">工作效率模板</label><textarea id="mr_e" rows="2">'+(r?esc(r.efficiency_template):'')+'</textarea></div></div>'+
+    '<div class="form-row"><div class="form-col"><label class="form-label">工作态度模板</label><select id="mr_a">'+attOpts+'</select></div></div>'+
+    '<div class="form-row"><div class="form-col-full"><label class="form-label">工作效果模板</label><textarea id="mr_f" rows="2">'+(r?esc(r.effect_template):'')+'</textarea></div></div>'+
+    '</div><div class="modal-footer"><button class="btn btn-default" onclick="closeModal(\'roleModal\')">取消</button><button class="btn btn-primary" onclick="saveRole(\''+(id||'')+'\')">保存</button></div></div>';
+  document.body.appendChild(overlay);
+}
+window.editRole=(id)=>openRoleModal(id);
+window.deleteRole=async(id)=>{if(!confirm('确定删除此角色？'))return;try{await db.del('roles',{id:'eq.'+id});toast('删除成功','success');renderRoles()}catch(e){toast('删除失败：'+e.message,'error')}};
+window.saveRole=async(id)=>{
+  const b={role_name:$('mr_name').value.trim(),quality_template:$('mr_q').value.trim(),efficiency_template:$('mr_e').value.trim(),attitude_template:$('mr_a').value,effect_template:$('mr_f').value.trim()};
+  if(!b.role_name){toast('请填写角色名','error');return}
+  try{if(id){await db.patch('roles',b,{id:'eq.'+id})}else{b.id=uid();await db.post('roles',{...b,is_preset:false})}
+    closeModal('roleModal');toast('保存成功','success');renderRoles();
+  }catch(e){toast('保存失败：'+e.message,'error')}
+};
+
+// ======== 页面3: 工时填报 ========
+let tsProjects=[],tsRoles=[],tsDraftData={};
+async function renderTimesheet(){
+  const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    const[projs,rls]=await Promise.all([db.get('projects',{select:'*',order:'created_at.desc'}),db.get('roles',{select:'*',order:'role_name.asc'})]);
+    tsProjects=projs;tsRoles=rls;rolesCache=rls;
+    const savedName=localStorage.getItem('last_employee_name')||'';
+    const savedProj=localStorage.getItem('last_project_id')||'';
+    const savedRole=localStorage.getItem('last_employee_role')||'';
+
+    // Month options
+    const now=new Date();
+    let mo='';for(let i=-6;i<=6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}" ${i===0?'selected':''}>${d.getFullYear()}年${d.getMonth()+1}月</option>`}
+
+    const projOpts=projs.map(p=>`<option value="${p.id}" ${p.id===savedProj?'selected':''}>${esc(p.project_name)}</option>`).join('');
+    const roleOpts=rls.map(r=>`<option value="${esc(r.role_name)}" ${r.role_name===savedRole?'selected':''}>${esc(r.role_name)}</option>`).join('');
+
+    wrap.innerHTML='<div class="card no-print"><div class="card-title">工时填报</div>'+
+      '<div class="form-row"><div class="form-col"><label class="form-label">员工姓名<span class="required">*</span></label><input type="text" id="ts_name" value="'+esc(savedName)+'" placeholder="请输入姓名"></div>'+
+      '<div class="form-col"><label class="form-label">项目<span class="required">*</span></label><select id="ts_proj">'+projOpts+'</select></div>'+
+      '<div class="form-col"><label class="form-label">角色<span class="required">*</span></label><div class="combobox-wrap"><input type="text" id="ts_role_input" list="ts_role_list" value="'+esc(savedRole)+'" placeholder="选择或输入角色" autocomplete="off"><datalist id="ts_role_list">'+roleOpts+'</datalist></div></div>'+
+      '<div class="form-col"><label class="form-label">月份</label><select id="ts_month" onchange="refreshTimesheet()">'+mo+'</select></div></div>'+
+      '<button class="btn btn-primary" onclick="loadTimesheetTable()">加载日历</button></div>'+
+      '<div id="tsTableArea"></div>';
+
+    // Role input handler for creating new role
+    $('ts_role_input').addEventListener('change',handleRoleChange);
+  }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
+}
+function handleRoleChange(){
+  const v=$('ts_role_input').value.trim();if(!v)return;
+  const found=tsRoles.find(r=>r.role_name===v);
+  if(!found&&tsRoles.length>0){
+    if(confirm('角色"'+v+'"不存在，是否创建新角色？')){
+      createRoleFromTS(v);
+    }
+  }
+}
+async function createRoleFromTS(name){
+  const tmpl=ROLE_TEMPLATES[name]||DEFAULT_TEMPLATE;
+  try{const r=await db.post('roles',{role_name:name,quality_template:tmpl.quality,efficiency_template:tmpl.efficiency,attitude_template:randPick(ATTITUDE_WORDS),effect_template:tmpl.effect,is_preset:false});
+    toast('角色创建成功','success');const rls=await db.get('roles',{select:'*',order:'role_name.asc'});tsRoles=rls;rolesCache=rls;
+    const dl=$('ts_role_list');dl.innerHTML=rls.map(r=>`<option value="${esc(r.role_name)}">`).join('');
+  }catch(e){toast('创建角色失败：'+e.message,'error')}
+}
+window.refreshTimesheet=()=>{const el=$('tsTableArea');if(el&&el.innerHTML.trim()!=='')loadTimesheetTable();};
+window.loadTimesheetTable=async()=>{
+  const name=$('ts_name').value.trim();const projId=$('ts_proj').value;const role=$('ts_role_input').value.trim();const month=$('ts_month').value;
+  if(!name||!projId||!role){toast('请填写员工姓名、选择项目和角色','error');return}
+  // Save preferences
+  localStorage.setItem('last_employee_name',name);localStorage.setItem('last_project_id',projId);localStorage.setItem('last_employee_role',role);
+  const proj=tsProjects.find(p=>p.id===projId);if(!proj){toast('项目不存在','error');return}
+  const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
+  // Load existing records
+  const existing=await db.get('timesheets',{project_id:'eq.'+projId,employee_name:'eq.'+encodeURIComponent(name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
+  // Load draft
+  const draftKey='draft_'+name+'_'+projId+'_'+month;let draft={};try{const d=localStorage.getItem(draftKey);if(d)draft=JSON.parse(d)}catch(e){}
+  const existMap={};if(existing)existing.forEach(r=>existMap[r.work_date]=r);
+
+  const wk=['日','一','二','三','四','五','六'];
+  let html='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">'+
+    '<div><div style="font-size:15px;font-weight:600">'+esc(proj.project_name)+'</div><div style="font-size:12px;color:#666">'+esc(name)+' | '+esc(role)+' | 应出勤'+proj.work_days_month+'天</div></div>'+
+    '<div style="font-size:16px;font-weight:700;color:#1890ff">'+y+'年'+m+'月</div></div>'+
+    '<div style="overflow-x:auto"><table class="cal-table" id="tsBodyTable"><thead><tr><th>日期</th><th>星期</th><th style="min-width:180px">工作内容</th><th style="width:70px">时长H</th><th style="width:70px">加班H</th><th style="min-width:80px">备注</th></tr></thead><tbody>';
+
+  // History content for autocomplete
+  const historyKey='content_history_'+name+'_'+projId;let history=[];
+  try{const h=localStorage.getItem(historyKey);if(h)history=JSON.parse(h)}catch(e){}
+
+  for(let d=1;d<=days;d++){
+    const ds=month+'-'+d.toString().padStart(2,'0');
+    const dt=new Date(y,m-1,d);const w=dt.getDay();
+    const cls=[];if(isWeekend(ds))cls.push('weekend');
+    const today=fmtDate(new Date());if(ds===today)cls.push('today');
+
+    let content='',hours=8,ot=0,remark='';
+    if(draft[ds]){content=draft[ds].content||'';hours=draft[ds].hours!==undefined?draft[ds].hours:8;ot=draft[ds].overtime_hours||0;remark=draft[ds].remark||''}
+    else if(existMap[ds]){content=existMap[ds].content||'';hours=existMap[ds].hours!==undefined?existMap[ds].hours:8;ot=existMap[ds].overtime_hours||0;remark=existMap[ds].remark||''}
+    else if(isWeekend(ds))hours=0;
+
+    const histOpts=history.filter(h=>h&&content&&h.includes(content)).slice(0,5).map(h=>`<option value="${esc(h)}">`).join('');
+
+    html+=`<tr class="${cls.join(' ')}" data-date="${ds}"><td class="day-num">${d}</td><td class="day-week">${wk[w]}</td>`+
+      `<td class="content-cell"><input type="text" class="ts-c" list="hist_${d}" placeholder="工作内容" value="${esc(content)}"><datalist id="hist_${d}">${histOpts}</datalist></td>`+
+      `<td><input type="number" class="ts-h" min="0" max="24" step="0.5" value="${hours}"></td>`+
+      `<td><input type="number" class="ts-o" min="0" max="24" step="0.5" value="${ot}"></td>`+
+      `<td><input type="text" class="ts-r" placeholder="备注" value="${esc(remark)}"></td></tr>`;
+  }
+  html+='</tbody></table></div>'+
+    '<div class="stat-bar"><div class="stat-item"><span class="stat-label">已填天数</span><span class="stat-value" id="stD">0</span></div>'+
+    '<div class="stat-item"><span class="stat-label">累计工时</span><span class="stat-value" id="stH">0</span></div>'+
+    '<div class="stat-item"><span class="stat-label">累计人天</span><span class="stat-value" id="stM">0</span></div>'+
+    '<div style="flex:1"></div><button class="btn btn-success btn-lg" id="btnSave" onclick="saveTimesheet()">提交保存</button></div></div>';
+
+  $('tsTableArea').innerHTML=html;
+  const tbody=$('tsBodyTable').querySelector('tbody');
+  tbody.addEventListener('input',()=>{calcTS();saveDraft();});
+  calcTS();
+}
+function calcTS(){
+  let fd=0,th=0;document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
+    const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;
+    if(c){fd++;th+=h}
+  });
+  const elD=$('stD'),elH=$('stH'),elM=$('stM');if(elD)elD.textContent=fd;if(elH)elH.textContent=th.toFixed(1);if(elM)elM.textContent=(th/8).toFixed(2);
+}
+function saveDraft(){
+  const name=$('ts_name').value.trim();const projId=$('ts_proj').value;const month=$('ts_month').value;
+  const draftKey='draft_'+name+'_'+projId+'_'+month;const data={};
+  document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
+    const ds=tr.dataset.date;const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;const o=parseFloat(tr.querySelector('.ts-o').value)||0;const r=tr.querySelector('.ts-r').value.trim();
+    if(c)data[ds]={content:c,hours:h,overtime_hours:o,remark:r};
+  });
+  localStorage.setItem(draftKey,JSON.stringify(data));
+}
+window.saveTimesheet=async()=>{
+  const btn=$('btnSave');if(btn){btn.disabled=true;btn.textContent='保存中...'}
+  try{
+    const name=$('ts_name').value.trim();const projId=$('ts_proj').value;const role=$('ts_role_input').value.trim();const month=$('ts_month').value;
+    const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
+    // Delete existing
+    await db.del('timesheets',{project_id:'eq.'+projId,employee_name:'eq.'+encodeURIComponent(name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days});
+    const rows=[];const contents=[];
+    document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
+      const ds=tr.dataset.date;const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;const o=parseFloat(tr.querySelector('.ts-o').value)||0;const r=tr.querySelector('.ts-r').value.trim();
+      if(c){rows.push({id:uid(),employee_name:name,employee_role:role,project_id:projId,work_date:ds,content:c,hours:h,overtime_hours:o,remark:r});contents.push(c)}
+    });
+    if(rows.length>0){
+      await db.post('timesheets',rows);
+      // Save history
+      const historyKey='content_history_'+name+'_'+projId;let history=[];
+      try{const h=localStorage.getItem(historyKey);if(h)history=JSON.parse(h)}catch(e){}
+      contents.forEach(c=>{if(!history.includes(c))history.unshift(c)});
+      localStorage.setItem(historyKey,JSON.stringify(history.slice(0,50)));
+    }
+    const draftKey='draft_'+name+'_'+projId+'_'+month;localStorage.removeItem(draftKey);
+    toast('工时提交成功！','success');
+  }catch(e){toast('提交失败：'+e.message,'error')}
+  finally{if(btn){btn.disabled=false;btn.textContent='提交保存'}}
+};
+
+// ======== 页面4: 工时查看 ========
+async function renderRecords(){
+  const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});
+    let mo='';for(let i=-6;i<=6;i++){const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}">${d.getFullYear()}年${d.getMonth()+1}月</option>`}
+    wrap.innerHTML='<div class="card no-print"><div class="card-title">工时查看</div>'+
+      '<div class="filter-bar"><div class="filter-item"><label>项目</label><select id="rec_proj"><option value="">全部</option>'+projs.map(p=>`<option value="${p.id}">${esc(p.project_name)}</option>`).join('')+'</select></div>'+
+      '<div class="filter-item"><label>月份</label><select id="rec_month">'+mo+'</select></div>'+
+      '<div class="filter-item"><label>员工姓名</label><input type="text" id="rec_name" placeholder="筛选姓名"></div>'+
+      '<div class="filter-item" style="flex:0"><button class="btn btn-primary" onclick="loadRecords(1)" style="margin-top:18px">查询</button></div></div></div>'+
+      '<div id="recTableArea"></div>';
+  }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
+}
+let recPage=1,recPageSize=20;
+window.loadRecords=async(p=1)=>{
+  recPage=p;const area=$('recTableArea');area.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    const projId=$('rec_proj').value;const month=$('rec_month').value;const name=$('rec_name').value.trim();
+    const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
+    let q={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*,projects(project_name)',order:'work_date.desc,employee_name',limit:recPageSize.toString(),offset:((p-1)*recPageSize).toString()};
+    if(projId)q.project_id='eq.'+projId;
+    if(name)q.employee_name='ilike.*'+encodeURIComponent(name)+'*';
+    const rows=await db.get('timesheets',q);
+    const totalQ={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'count'};
+    if(projId)totalQ.project_id='eq.'+projId;
+    if(name)totalQ.employee_name='ilike.*'+encodeURIComponent(name)+'*';
+    let total=rows?rows.length:0;try{const c=await db.get('timesheets',totalQ);if(c&&c[0])total=parseInt(c[0].count)}catch(e){}
+    const totalPages=Math.ceil(total/recPageSize)||1;
+
+    const html='<div class="card"><table class="data-table"><thead><tr><th>日期</th><th>员工</th><th>角色</th><th>项目</th><th>工作内容</th><th>时长</th><th>加班</th></tr></thead><tbody>'+
+      (rows&&rows.length?rows.map(r=>`<tr><td>${r.work_date}</td><td>${esc(r.employee_name)}</td><td>${esc(r.employee_role)}</td><td>${esc(r.projects?.project_name||'')}</td><td class="cell-content">${esc(r.content)}</td><td>${r.hours}</td><td>${r.overtime_hours}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#999;padding:30px">暂无记录</td></tr>')+
+      '</tbody></table>'+(totalPages>1?renderPagination(p,totalPages,'loadRecords'):'')+'</div>';
+    area.innerHTML=html;
+  }catch(e){area.innerHTML='<div class="card">查询失败：'+esc(e.message)+'</div>'}
+}
+function renderPagination(cur,total,fn){
+  let h='<div class="pagination">';
+  h+=`<button class="page-btn" ${cur===1?'disabled':''} onclick="${fn}(${cur-1})">上一页</button>`;
+  for(let i=1;i<=total;i++){if(i===1||i===total||Math.abs(i-cur)<=2)h+=`<button class="page-btn ${i===cur?'active':''}" onclick="${fn}(${i})">${i}</button>`;else if(Math.abs(i-cur)===3)h+='<span style="color:#999">...</span>'}
+  h+=`<button class="page-btn" ${cur===total?'disabled':''} onclick="${fn}(${cur+1})">下一页</button>`;
+  h+='</div>';return h;
+}
+
+// ======== 页面5: 实施单 ========
+let implCache=null;
+async function renderImplement(){
+  const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
+  try{
+    const projs=await db.get('projects',{select:'*',order:'created_at.desc'});
+    let mo='';for(let i=-6;i<=6;i++){const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}" ${i===0?'selected':''}>${d.getFullYear()}年${d.getMonth()+1}月</option>`}
+    wrap.innerHTML='<div class="card no-print"><div class="card-title">实施单生成</div>'+
+      '<div class="filter-bar"><div class="filter-item"><label>项目<span class="required">*</span></label><select id="imp_proj">'+projs.map(p=>`<option value="${p.id}">${esc(p.project_name)}</option>`).join('')+'</select></div>'+
+      '<div class="filter-item"><label>月份<span class="required">*</span></label><select id="imp_month">'+mo+'</select></div>'+
+      '<div class="filter-item" style="flex:0"><button class="btn btn-primary" onclick="queryImplement()" style="margin-top:18px">查询</button></div></div></div>'+
+      '<div id="implArea"></div>';
+  }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
+}
+window.queryImplement=async()=>{
+  const area=$('implArea');area.innerHTML='<div class="loading"><span class="spinner"></span>查询中...</div>';
+  try{
+    const projId=$('imp_proj').value;const month=$('imp_month').value;
+    if(!projId){toast('请选择项目','error');return}
+    const proj=projectsCache.find(p=>p.id===projId);if(!proj){const p=await db.get('projects',{id:'eq.'+projId,select:'*'});if(p&&p[0])projectsCache.push(p[0])}
+    const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
+    const rows=await db.get('timesheets',{project_id:'eq.'+projId,work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
+    if(!rows||rows.length===0){area.innerHTML='<div class="card" style="text-align:center;color:#999;padding:40px">该月份暂无工时记录。</div>';return}
+    // Group by employee
+    const emps={};
+    rows.forEach(r=>{
+      if(!emps[r.employee_name])emps[r.employee_name]={name:r.employee_name,role:r.employee_role,totalHours:0,days:0,dates:[],contents:new Set()};
+      emps[r.employee_name].totalHours+=r.hours||0;emps[r.employee_name].days++;
+      emps[r.employee_name].dates.push(r.work_date);if(r.content)emps[r.employee_name].contents.add(r.content);
+    });
+    implCache={projId,month,employees:emps,project:projectsCache.find(p=>p.id===projId)};
+    const empArr=Object.values(emps);
+    let html='<div class="card no-print"><div class="card-title">选择员工生成实施单</div><div class="emp-grid">'+
+      empArr.map((e,i)=>`<div class="emp-card" data-idx="${i}" onclick="selectEmp(${i})"><div class="emp-name">${esc(e.name)}</div><div class="emp-role">${esc(e.role)}</div><div class="emp-stats"><span>${e.days}天</span><span>${e.totalHours.toFixed(1)}H</span></div></div>`).join('')+
+      '</div><div style="text-align:center;margin-top:12px"><button class="btn btn-success btn-lg" onclick="generateImpl()">生成实施单</button></div></div>';
+    area.innerHTML=html;
+  }catch(e){area.innerHTML='<div class="card">查询失败：'+esc(e.message)+'</div>'}
+}
+window.selectEmp=(idx)=>{document.querySelectorAll('.emp-card').forEach((c,i)=>c.classList.toggle('selected',i===idx));implCache.selected=idx};
+window.generateImpl=async()=>{
+  if(!implCache||implCache.selected===undefined){toast('请先选择一个员工','error');return}
+  const emp=Object.values(implCache.employees)[implCache.selected];
+  const proj=implCache.project;const month=implCache.month;
+  if(!proj){toast('项目信息缺失','error');return}
+  // Check existing
+  try{const ex=await db.get('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month,select:'*'});if(ex&&ex.length>0){if(!confirm('该员工本月已存在实施单，是否覆盖？'))return}}
+  catch(e){}
+
+  const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
+  const rows=await db.get('timesheets',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
+  if(!rows||rows.length===0){toast('无工时记录','error');return}
+
+  const contents=[];const uq=new Set();let totalHours=0,recordDays=0,minD='',maxD='';
+  rows.forEach(r=>{if(r.content&&!uq.has(r.content)){uq.add(r.content);contents.push(r.content)}totalHours+=r.hours||0;recordDays++;
+    if(!minD||r.work_date<minD)minD=r.work_date;if(!maxD||r.work_date>maxD)maxD=r.work_date});
+
+  const manDays=totalHours/8;const subtotal=manDays*proj.unit_price;const attRate=proj.work_days_month?(recordDays/proj.work_days_month):0;
+  // Get role templates
+  if(!rolesCache||rolesCache.length===0)rolesCache=await db.get('roles',{select:'*'});
+  const role=rolesCache.find(r=>r.role_name===emp.role);const tmpl=role||DEFAULT_TEMPLATE;
+  const summary=smartCompress(contents.join('；'),500);
+
+  const implData={id:uid(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
+
+  // Save
+  try{await db.del('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month});
+    await db.post('implementations',implData);
+  }catch(e){console.error('save impl err',e)}
+
+  implCache.currentData=implData;
+  renderImplSheet(implData,proj,emp,recordDays);
+}
+function smartCompress(text,maxLen){
+  if(text.length<=maxLen)return text;
+  const parts=text.split('；');const result=[];let len=0;
+  for(const p of parts){if(len+p.length+1>maxLen)break;result.push(p);len+=p.length+1}
+  return result.join('；')+'...(等)';
+}
+function renderImplSheet(data,proj,emp,recordDays){
+  const area=$('implArea');
+  area.innerHTML='<div class="card implement-sheet" id="implSheet">'+
+    '<div class="sheet-title">实施服务确认单</div>'+
+    '<div class="sheet-subtitle">本月应出勤天数：'+proj.work_days_month+' 天</div>'+
+    '<table class="sheet-table"><tr><th style="width:12%">甲方</th><td style="width:38%">'+esc(proj.party_a)+'</td><th style="width:12%">乙方</th><td style="width:38%">'+esc(proj.party_b)+'</td></tr>'+
+    '<tr><th>服务项目</th><td>'+esc(proj.project_name)+'</td><th>起止日期</th><td>'+data.start_date+' 至 '+data.end_date+'</td></tr></table>'+
+    '<div class="sheet-section-title">工作完成情况：</div>'+
+    '<table class="sheet-table"><thead><tr><th style="width:10%">姓名</th><th style="width:12%">角色</th><th style="width:36%">工作完成情况</th><th style="width:12%">单价（元）</th><th style="width:12%">人天数</th><th style="width:18%">小计</th></tr></thead><tbody>'+
+    '<tr><td>'+esc(emp.name)+'</td><td>'+esc(emp.role)+'</td><td><textarea id="i_summary" rows="3">'+esc(data.work_summary)+'</textarea></td><td>'+proj.unit_price.toFixed(2)+'</td><td>'+data.total_days.toFixed(2)+'</td><td>'+data.total_amount.toFixed(2)+'</td></tr></tbody></table>'+
+    '<table class="sheet-table"><tr><th style="width:20%">核减金额（元）</th><td style="width:30%"><input type="number" id="i_deduct" min="0" step="0.01" value="" style="text-align:right" placeholder=" "></td><th style="width:20%">实际结算金额（元）</th><td style="width:30%;text-align:right;font-weight:700" id="i_final">'+data.total_amount.toFixed(2)+'</td></tr></table>'+
+    '<div class="sheet-section-title">交付文档：</div>'+
+    '<table class="sheet-table"><tr><td><textarea id="i_docs" rows="2" placeholder=" "></textarea></td></tr></table>'+
+    '<div class="sheet-section-title">工作评价（必填：由使用人填写）</div>'+
+    '<table class="sheet-table">'+
+    '<tr><th style="width:18%">工作质量</th><td><textarea id="i_quality" rows="2">'+esc(data.quality)+'</textarea></td></tr>'+
+    '<tr><th>工作效率</th><td><textarea id="i_efficiency" rows="2">'+esc(data.efficiency)+'</textarea></td></tr>'+
+    '<tr><th>工作态度</th><td><select id="i_attitude" style="border:none;font-size:10pt">'+ATTITUDE_WORDS.map(w=>`<option value="${esc(w)}" ${w===(data.attitude||'良好')?'selected':''}>${esc(w)}</option>`).join('')+'</select></td></tr>'+
+    '<tr><th>出勤率</th><td><input type="text" value="'+(data.attendance_rate*100).toFixed(1)+'%" readonly style="background:#f9f9f9"></td></tr>'+
+    '<tr><th>工作效果</th><td><textarea id="i_effect" rows="2">'+esc(data.effect)+'</textarea></td></tr>'+
+    '</table>'+
+    '<div class="sheet-section-title">工作签字确认：</div>'+
+    '<div class="sheet-sign-area"><div class="sheet-sign-box">甲方：<span class="sheet-sign-placeholder">（甲方签字）</span></div><div class="sheet-sign-box">乙方：<img src="'+PARTY_B_SIGNATURE+'" alt="乙方签名"></div></div>'+
+    '<div class="sheet-note">本确认单一式贰份，甲方执贰份，乙方执一份，经双方项目经理或授权代表签字后有效。</div></div>'+
+    '<div class="no-print" style="display:flex;gap:10px;justify-content:center;margin:16px 0"><button class="btn btn-success" onclick="exportImplExcel()">导出Excel</button><button class="btn btn-default" onclick="window.print()">打印</button><button class="btn btn-primary" onclick="updateImpl()">更新实施单</button></div>';
+
+  $('i_deduct').addEventListener('input',()=>{const d=parseFloat($('i_deduct').value)||0;$('i_final').textContent=(data.total_amount-d).toFixed(2)});
+}
+window.updateImpl=async()=>{
+  if(!implCache||!implCache.currentData)return;
+  const d=implCache.currentData;const proj=implCache.project;
+  const updateBody={work_summary:$('i_summary').value,deduction:parseFloat($('i_deduct').value)||null,final_amount:parseFloat($('i_final').textContent)||d.total_amount,quality:$('i_quality').value,efficiency:$('i_efficiency').value,attitude:$('i_attitude').value,effect:$('i_effect').value};
+  try{await db.patch('implementations',updateBody,{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(d.employee_name),month:'eq.'+d.month});toast('实施单更新成功','success')}
+  catch(e){toast('更新失败：'+e.message,'error')}
+}
+window.exportImplExcel=()=>{
+  const sheet=$('implSheet');if(!sheet){toast('请先生成实施单','error');return}
+  try{
+    const wb=XLSX.utils.book_new();const wsData=[];
+    wsData.push(['实施服务确认单']);wsData.push(['','','','本月应出勤天数：'+implCache.project.work_days_month+' 天']);
+    wsData.push(['甲方',implCache.project.party_a,'','乙方',implCache.project.party_b]);
+    wsData.push(['服务项目',implCache.project.project_name,'','起止日期',($('implSheet').querySelectorAll('td')[3]?.textContent||'')]);
+    wsData.push(['工作完成情况：']);wsData.push(['姓名','角色','工作完成情况','单价(元)','人天数','小计']);
+    const d=implCache.currentData;const e=Object.values(implCache.employees)[implCache.selected];
+    wsData.push([e.name,e.role,$('i_summary').value,implCache.project.unit_price,d.total_days,d.total_amount]);
+    wsData.push(['核减金额(元)',parseFloat($('i_deduct').value)||'','','实际结算金额(元)',parseFloat($('i_final').textContent)||d.total_amount]);
+    wsData.push(['交付文档']);wsData.push([$('i_docs').value||'']);
+    wsData.push(['工作评价(必填：由使用人填写)']);wsData.push(['工作质量',$('i_quality').value]);
+    wsData.push(['工作效率',$('i_efficiency').value]);wsData.push(['工作态度',$('i_attitude').value]);
+    wsData.push(['出勤率',(d.attendance_rate*100).toFixed(1)+'%']);wsData.push(['工作效果',$('i_effect').value]);
+    wsData.push(['工作签字确认：']);wsData.push(['甲方：（签字）','','','乙方：（已签名）']);
+    wsData.push(['本确认单一式贰份，甲方执贰份，乙方执一份，经双方项目经理或授权代表签字后有效。']);
+    const ws=XLSX.utils.aoa_to_sheet(wsData);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}},{s:{r:1,c:4},e:{r:1,c:5}},{s:{r:2,c:1},e:{r:2,c:2}},{s:{r:2,c:4},e:{r:2,c:5}},{s:{r:3,c:1},e:{r:3,c:2}},{s:{r:3,c:4},e:{r:3,c:5}},{s:{r:4,c:0},e:{r:4,c:5}},{s:{r:6,c:2},e:{r:6,c:2}},{s:{r:7,c:1},e:{r:7,c:2}},{s:{r:7,c:4},e:{r:7,c:5}},{s:{r:8,c:0},e:{r:8,c:5}},{s:{r:9,c:0},e:{r:9,c:5}},{s:{r:10,c:0},e:{r:10,c:5}},{s:{r:11,c:1},e:{r:11,c:5}},{s:{r:12,c:1},e:{r:12,c:5}},{s:{r:13,c:1},e:{r:13,c:5}},{s:{r:14,c:1},e:{r:14,c:5}},{s:{r:15,c:1},e:{r:15,c:5}},{s:{r:16,c:0},e:{r:16,c:5}},{s:{r:17,c:0},e:{r:17,c:5}},{s:{r:18,c:0},e:{r:18,c:5}}];
+    ws['!cols']=[{wch:15},{wch:15},{wch:50},{wch:15},{wch:15},{wch:15}];
+    XLSX.utils.book_append_sheet(wb,ws,'实施服务确认单');
+    XLSX.writeFile(wb,`实施服务确认单_${implCache.project.project_name}_${d.employee_name}_${d.month}.xlsx`);
+    toast('Excel导出成功！','success');
+  }catch(err){toast('导出失败：'+err.message,'error')}
+};
+
+// ======== 通用 ========
+window.closeModal=(id)=>{const el=$(id);if(el)el.remove()};
+
+function renderPage(){
+  const wrap=$('pageWrap');
+  switch(currentPage){
+    case'projects':renderProjects();break;
+    case'roles':renderRoles();break;
+    case'timesheet':renderTimesheet();break;
+    case'records':renderRecords();break;
+    case'implement':renderImplement();break;
+    default:renderTimesheet();
+  }
+  // Update nav active
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.toggle('active',l.dataset.page===currentPage));
+}
+
+function init(){
+  const app=$('app');app.innerHTML='';
+  renderNav();
+  renderContainer();
+  renderPage();
+}
+
+init();
+</script>
+</body>
+</html>
