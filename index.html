@@ -240,16 +240,52 @@ function gup(k){return new URLSearchParams(location.search).get(k)}
 function handleSupaErr(txt){
   try{const j=JSON.parse(txt);if(j.code==='42501'||j.message?.includes('row-level security'))return '权限不足：请在Supabase控制台中为该表启用RLS策略（允许匿名用户读写）。';return j.message||j.error||txt}catch(e){return txt}
 }
+
+// 【修复1】sup() 函数支持数组参数（解决日期范围查询重复 key 被覆盖的问题）
 function sup(){
   const h={'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-  return{async get(t,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{headers:h});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async post(t,b,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'POST',headers:h,body:JSON.stringify(b)});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async patch(t,b,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'PATCH',headers:h,body:JSON.stringify(b)});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return r.json()},async del(t,q={}){const u=new URL(SUPABASE_URL+'/'+t);Object.entries(q).forEach(([k,v])=>u.searchParams.append(k,v));const r=await fetch(u,{method:'DELETE',headers:h});if(!r.ok)throw new Error(handleSupaErr(await r.text()));return true}}
+  function appendParams(u,q){
+    Object.entries(q).forEach(([k,v])=>{
+      if(Array.isArray(v)){v.forEach(item=>u.searchParams.append(k,item))}
+      else if(v!==undefined&&v!==null){u.searchParams.append(k,v)}
+    });
+  }
+  return{
+    async get(t,q={}){
+      const u=new URL(SUPABASE_URL+'/'+t);
+      appendParams(u,q);
+      const r=await fetch(u,{headers:h});
+      if(!r.ok)throw new Error(handleSupaErr(await r.text()));
+      return r.json()
+    },
+    async post(t,b,q={}){
+      const u=new URL(SUPABASE_URL+'/'+t);
+      appendParams(u,q);
+      const r=await fetch(u,{method:'POST',headers:h,body:JSON.stringify(b)});
+      if(!r.ok)throw new Error(handleSupaErr(await r.text()));
+      return r.json()
+    },
+    async patch(t,b,q={}){
+      const u=new URL(SUPABASE_URL+'/'+t);
+      appendParams(u,q);
+      const r=await fetch(u,{method:'PATCH',headers:h,body:JSON.stringify(b)});
+      if(!r.ok)throw new Error(handleSupaErr(await r.text()));
+      return r.json()
+    },
+    async del(t,q={}){
+      const u=new URL(SUPABASE_URL+'/'+t);
+      appendParams(u,q);
+      const r=await fetch(u,{method:'DELETE',headers:h});
+      if(!r.ok)throw new Error(handleSupaErr(await r.text()));
+      return true
+    }
+  }
 }
 const db=sup();
 
 // ======== 全局状态 ========
 let currentPage=gup('page')||'timesheet';
 let projectsCache=[],rolesCache=[];
-// 【修复1】新增：全局项目名称映射表，解决 loadRecords 中访问不到的问题
 let projNameMap={};
 
 // ======== 导航 ========
@@ -346,7 +382,6 @@ async function renderTimesheet(){
     const savedProj=localStorage.getItem('last_project_id')||'';
     const savedRole=localStorage.getItem('last_employee_role')||'';
 
-    // Month options
     const now=new Date();
     let mo='';for(let i=-6;i<=6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}" ${i===0?'selected':''}>${d.getFullYear()}年${d.getMonth()+1}月</option>`}
 
@@ -361,7 +396,6 @@ async function renderTimesheet(){
       '<button class="btn btn-primary" onclick="loadTimesheetTable()">加载日历</button></div>'+
       '<div id="tsTableArea"></div>';
 
-    // Role input handler for creating new role
     $('ts_role_input').addEventListener('change',handleRoleChange);
   }catch(e){wrap.innerHTML='<div class="card">加载失败：'+esc(e.message)+'</div>'}
 }
@@ -385,13 +419,19 @@ window.refreshTimesheet=()=>{const el=$('tsTableArea');if(el&&el.innerHTML.trim(
 window.loadTimesheetTable=async()=>{
   const name=$('ts_name').value.trim();const projId=$('ts_proj').value;const role=$('ts_role_input').value.trim();const month=$('ts_month').value;
   if(!name||!projId||!role){toast('请填写员工姓名、选择项目和角色','error');return}
-  // Save preferences
   localStorage.setItem('last_employee_name',name);localStorage.setItem('last_project_id',projId);localStorage.setItem('last_employee_role',role);
   const proj=tsProjects.find(p=>p.id===projId);if(!proj){toast('项目不存在','error');return}
   const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-  // Load existing records
-  const existing=await db.get('timesheets',{project_id:'eq.'+projId,employee_name:'eq.'+encodeURIComponent(name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
-  // Load draft
+  
+  // 【修复2】移除 encodeURIComponent，改用数组传日期范围
+  const existing=await db.get('timesheets',{
+    project_id:'eq.'+projId,
+    employee_name:'eq.'+name,
+    work_date:['gte.'+month+'-01','lte.'+month+'-'+days],
+    select:'*',
+    order:'work_date.asc'
+  });
+  
   const draftKey='draft_'+name+'_'+projId+'_'+month;let draft={};try{const d=localStorage.getItem(draftKey);if(d)draft=JSON.parse(d)}catch(e){}
   const existMap={};if(existing)existing.forEach(r=>existMap[r.work_date]=r);
 
@@ -401,7 +441,6 @@ window.loadTimesheetTable=async()=>{
     '<div style="font-size:16px;font-weight:700;color:#1890ff">'+y+'年'+m+'月</div></div>'+
     '<div style="overflow-x:auto"><table class="cal-table" id="tsBodyTable"><thead><tr><th>日期</th><th>星期</th><th style="min-width:180px">工作内容</th><th style="width:70px">时长H</th><th style="width:70px">加班H</th><th style="min-width:80px">备注</th></tr></thead><tbody>';
 
-  // History content for autocomplete
   const historyKey='content_history_'+name+'_'+projId;let history=[];
   try{const h=localStorage.getItem(historyKey);if(h)history=JSON.parse(h)}catch(e){}
 
@@ -456,8 +495,14 @@ window.saveTimesheet=async()=>{
   try{
     const name=$('ts_name').value.trim();const projId=$('ts_proj').value;const role=$('ts_role_input').value.trim();const month=$('ts_month').value;
     const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-    // Delete existing
-    await db.del('timesheets',{project_id:'eq.'+projId,employee_name:'eq.'+encodeURIComponent(name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days});
+    
+    // 【修复2】移除 encodeURIComponent，改用数组传日期范围
+    await db.del('timesheets',{
+      project_id:'eq.'+projId,
+      employee_name:'eq.'+name,
+      work_date:['gte.'+month+'-01','lte.'+month+'-'+days]
+    });
+    
     const rows=[];const contents=[];
     document.querySelectorAll('#tsBodyTable tbody tr').forEach(tr=>{
       const ds=tr.dataset.date;const c=tr.querySelector('.ts-c').value.trim();const h=parseFloat(tr.querySelector('.ts-h').value)||0;const o=parseFloat(tr.querySelector('.ts-o').value)||0;const r=tr.querySelector('.ts-r').value.trim();
@@ -465,7 +510,6 @@ window.saveTimesheet=async()=>{
     });
     if(rows.length>0){
       await db.post('timesheets',rows);
-      // Save history
       const historyKey='content_history_'+name+'_'+projId;let history=[];
       try{const h=localStorage.getItem(historyKey);if(h)history=JSON.parse(h)}catch(e){}
       contents.forEach(c=>{if(!history.includes(c))history.unshift(c)});
@@ -482,7 +526,6 @@ async function renderRecords(){
   const wrap=$('pageWrap');wrap.innerHTML='<div class="loading"><span class="spinner"></span>加载中...</div>';
   try{
     const projs=await db.get('projects',{select:'*',order:'created_at.desc'});
-    // 【修复2】将局部变量改为写入全局 projNameMap，供 loadRecords 使用
     projNameMap={};
     projs.forEach(p=>projNameMap[p.id]=p.project_name);
     let mo='';for(let i=-6;i<=6;i++){const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);const v=getYM(d);mo+=`<option value="${v}">${d.getFullYear()}年${d.getMonth()+1}月</option>`}
@@ -497,7 +540,6 @@ async function renderRecords(){
 let recPage=1,recPageSize=20;
 window.loadRecords=async(p=1)=>{
   recPage=p;
-  // 【修复3】增加兜底：如果 projNameMap 为空（如直接刷新页面），从 projectsCache 或重新请求补全
   if(Object.keys(projNameMap).length===0){
     if(projectsCache.length>0){
       projectsCache.forEach(p=>projNameMap[p.id]=p.project_name);
@@ -513,13 +555,27 @@ window.loadRecords=async(p=1)=>{
   try{
     const projId=$('rec_proj').value;const month=$('rec_month').value;const name=$('rec_name').value.trim();
     const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-    let q={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.desc,employee_name',limit:recPageSize.toString(),offset:((p-1)*recPageSize).toString()};
+    
+    // 【修复3】移除 encodeURIComponent；日期范围改用数组
+    let q={
+      work_date:['gte.'+month+'-01','lte.'+month+'-'+days],
+      select:'*',
+      order:'work_date.desc,employee_name',
+      limit:recPageSize.toString(),
+      offset:((p-1)*recPageSize).toString()
+    };
     if(projId)q.project_id='eq.'+projId;
-    if(name)q.employee_name='ilike.*'+encodeURIComponent(name)+'*';
+    if(name)q.employee_name='ilike.*'+name+'*';
+    
     const rows=await db.get('timesheets',q);
-    const totalQ={work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'count'};
+    
+    const totalQ={
+      work_date:['gte.'+month+'-01','lte.'+month+'-'+days],
+      select:'count'
+    };
     if(projId)totalQ.project_id='eq.'+projId;
-    if(name)totalQ.employee_name='ilike.*'+encodeURIComponent(name)+'*';
+    if(name)totalQ.employee_name='ilike.*'+name+'*';
+    
     let total=rows?rows.length:0;try{const c=await db.get('timesheets',totalQ);if(c&&c[0])total=parseInt(c[0].count)}catch(e){}
     const totalPages=Math.ceil(total/recPageSize)||1;
 
@@ -558,9 +614,16 @@ window.queryImplement=async()=>{
     if(!projId){toast('请选择项目','error');return}
     const proj=projectsCache.find(p=>p.id===projId);if(!proj){const p=await db.get('projects',{id:'eq.'+projId,select:'*'});if(p&&p[0])projectsCache.push(p[0])}
     const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-    const rows=await db.get('timesheets',{project_id:'eq.'+projId,work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
+    
+    // 【修复2】日期范围改用数组
+    const rows=await db.get('timesheets',{
+      project_id:'eq.'+projId,
+      work_date:['gte.'+month+'-01','lte.'+month+'-'+days],
+      select:'*',
+      order:'work_date.asc'
+    });
+    
     if(!rows||rows.length===0){area.innerHTML='<div class="card" style="text-align:center;color:#999;padding:40px">该月份暂无工时记录。</div>';return}
-    // Group by employee
     const emps={};
     rows.forEach(r=>{
       if(!emps[r.employee_name])emps[r.employee_name]={name:r.employee_name,role:r.employee_role,totalHours:0,days:0,dates:[],contents:new Set()};
@@ -581,12 +644,29 @@ window.generateImpl=async()=>{
   const emp=Object.values(implCache.employees)[implCache.selected];
   const proj=implCache.project;const month=implCache.month;
   if(!proj){toast('项目信息缺失','error');return}
-  // Check existing
-  try{const ex=await db.get('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month,select:'*'});if(ex&&ex.length>0){if(!confirm('该员工本月已存在实施单，是否覆盖？'))return}}
-  catch(e){}
+  
+  try{
+    // 【修复3】移除 encodeURIComponent
+    const ex=await db.get('implementations',{
+      project_id:'eq.'+proj.id,
+      employee_name:'eq.'+emp.name,
+      month:'eq.'+month,
+      select:'*'
+    });
+    if(ex&&ex.length>0){if(!confirm('该员工本月已存在实施单，是否覆盖？'))return}
+  }catch(e){}
 
   const[y,m]=month.split('-').map(Number);const days=monthDays(y,m);
-  const rows=await db.get('timesheets',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),work_date:'gte.'+month+'-01',work_date:'lte.'+month+'-'+days,select:'*',order:'work_date.asc'});
+  
+  // 【修复3】移除 encodeURIComponent，日期范围改用数组
+  const rows=await db.get('timesheets',{
+    project_id:'eq.'+proj.id,
+    employee_name:'eq.'+emp.name,
+    work_date:['gte.'+month+'-01','lte.'+month+'-'+days],
+    select:'*',
+    order:'work_date.asc'
+  });
+  
   if(!rows||rows.length===0){toast('无工时记录','error');return}
 
   const contents=[];const uq=new Set();let totalHours=0,recordDays=0,minD='',maxD='';
@@ -594,15 +674,19 @@ window.generateImpl=async()=>{
     if(!minD||r.work_date<minD)minD=r.work_date;if(!maxD||r.work_date>maxD)maxD=r.work_date});
 
   const manDays=totalHours/8;const subtotal=manDays*proj.unit_price;const attRate=proj.work_days_month?(recordDays/proj.work_days_month):0;
-  // Get role templates
   if(!rolesCache||rolesCache.length===0)rolesCache=await db.get('roles',{select:'*'});
   const role=rolesCache.find(r=>r.role_name===emp.role);const tmpl=role||DEFAULT_TEMPLATE;
   const summary=smartCompress(contents.join('；'),500);
 
   const implData={id:uuid(),project_id:proj.id,employee_name:emp.name,employee_role:emp.role,month,work_summary:summary,start_date:minD,end_date:maxD,total_days:manDays,total_amount:subtotal,attendance_rate:attRate,quality:tmpl.quality_template||tmpl.quality,efficiency:tmpl.efficiency_template||tmpl.efficiency,attitude:tmpl.attitude_template||randPick(ATTITUDE_WORDS),effect:tmpl.effect_template||tmpl.effect};
 
-  // Save
-  try{await db.del('implementations',{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(emp.name),month:'eq.'+month});
+  try{
+    // 【修复3】移除 encodeURIComponent
+    await db.del('implementations',{
+      project_id:'eq.'+proj.id,
+      employee_name:'eq.'+emp.name,
+      month:'eq.'+month
+    });
     await db.post('implementations',implData);
   }catch(e){console.error('save impl err',e)}
 
@@ -647,8 +731,15 @@ window.updateImpl=async()=>{
   if(!implCache||!implCache.currentData)return;
   const d=implCache.currentData;const proj=implCache.project;
   const updateBody={work_summary:$('i_summary').value,deduction:parseFloat($('i_deduct').value)||null,final_amount:parseFloat($('i_final').textContent)||d.total_amount,quality:$('i_quality').value,efficiency:$('i_efficiency').value,attitude:$('i_attitude').value,effect:$('i_effect').value};
-  try{await db.patch('implementations',updateBody,{project_id:'eq.'+proj.id,employee_name:'eq.'+encodeURIComponent(d.employee_name),month:'eq.'+d.month});toast('实施单更新成功','success')}
-  catch(e){toast('更新失败：'+e.message,'error')}
+  try{
+    // 【修复3】移除 encodeURIComponent
+    await db.patch('implementations',updateBody,{
+      project_id:'eq.'+proj.id,
+      employee_name:'eq.'+d.employee_name,
+      month:'eq.'+d.month
+    });
+    toast('实施单更新成功','success')
+  }catch(e){toast('更新失败：'+e.message,'error')}
 }
 window.exportImplExcel=()=>{
   const sheet=$('implSheet');if(!sheet){toast('请先生成实施单','error');return}
@@ -689,7 +780,6 @@ function renderPage(){
     case'implement':renderImplement();break;
     default:renderTimesheet();
   }
-  // Update nav active
   document.querySelectorAll('.nav-link').forEach(l=>l.classList.toggle('active',l.dataset.page===currentPage));
 }
 
