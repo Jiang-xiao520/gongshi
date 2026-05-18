@@ -100,12 +100,12 @@ textarea{resize:vertical;min-height:60px}
 .sheet{background:#fff;padding:0;font-size:11pt}
 .sheet-title{text-align:center;font-size:17pt;font-weight:700;margin-bottom:12px;letter-spacing:2px}
 .sheet-subtitle{text-align:right;font-size:10pt;margin-bottom:8px;color:#333}
-.sheet-table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.sheet-table{width:100%;border-collapse:collapse;margin-bottom:0;font-size:10pt}
 .sheet-table th,.sheet-table td{border:1px solid #000;padding:6px 8px;font-size:10pt;vertical-align:middle}
 .sheet-table th{background:#f5f5f5;font-weight:600;text-align:center}
 .sheet-table td input,.sheet-table td textarea,.sheet-table td select{width:100%;border:none;font-size:10pt;font-family:inherit;outline:none;resize:vertical;background:transparent}
 .sheet-table td input[readonly],.sheet-table td textarea[readonly]{background:#f9f9f9}
-.sheet-section-title{font-size:10pt;font-weight:600;margin:10px 0 4px}
+.sheet-section-title{font-size:10pt;font-weight:600;margin:0}
 .sheet-sign-area{display:flex;gap:80px;margin-top:16px;align-items:center}
 .sheet-sign-box{display:flex;align-items:center;gap:6px;font-size:10pt}
 .sheet-sign-box img{max-width:120px;height:auto;border:1px solid #ccc}
@@ -173,24 +173,68 @@ textarea{resize:vertical;min-height:60px}
 
 /* ===== Print ===== */
 @media print{
+  @page{size:A4 portrait;margin:10mm}
   body{background:#fff}
   .no-print{display:none!important}
   .card{box-shadow:none;padding:0;margin:0}
   .container{max-width:100%;padding:0}
-  .sheet input,.sheet textarea,.sheet select{border:none!important;outline:none!important;background:transparent!important}
-  .sheet-table td,.sheet-table th{border:1px solid #000!important}
-  .stat-bar{display:none!important}
-  .top-nav{display:none!important}
-  /* 打印分页控制 */
-  .print-page-break{page-break-after:always!important}
-  .print-page-break:last-child{page-break-after:auto!important}
-  .sheet-table{page-break-inside:avoid!important}
-  .sheet-table tr{page-break-inside:avoid!important}
-  /* 实施单打印字体微调 */
-  .sheet-title{font-size:16pt!important;margin-bottom:8px!important}
-  .sheet-section-title{font-size:10pt!important;margin:6px 0 2px!important}
-  .sheet-note{font-size:8pt!important}
+  
+  /* A4分页控制 */
+  .print-page-break{
+    page-break-after:always;
+    width:100%;
+    overflow:hidden;
+    box-sizing:border-box;
+  }
+  .print-page-break:last-child{page-break-after:auto}
+  
+  /* 表格实线紧凑 */
+  .sheet-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:0;
+    font-size:9pt;
+  }
+  .sheet-table th,.sheet-table td{
+    border:1px solid #000!important;
+    padding:2px 4px!important;
+    line-height:1.3;
+  }
+  
+  /* section title行高0.5cm≈14px */
+  .sheet-table .section-row td{
+    height:14px;
+    line-height:14px;
+    padding:0 4px!important;
+    font-size:9pt;
+    font-weight:600;
+  }
+  
+  /* 防止表格内分页 */
+  .sheet-table tr{page-break-inside:avoid}
+  
+  /* 工时明细表更紧凑 */
+  .timesheet-detail td,.timesheet-detail th{
+    font-size:8.5pt;
+    padding:1px 3px!important;
+    line-height:1.2;
+  }
+  
+  /* 签名区 */
+  .sign-row td{vertical-align:middle}
+  
+  /* 隐藏副标题 */
   .sheet-subtitle{display:none!important}
+  
+  /* 输入框无边框 */
+  .sheet-table input,.sheet-table textarea{
+    border:none!important;
+    outline:none!important;
+    background:transparent!important;
+  }
+  
+  .sheet-title{font-size:16pt!important;margin-bottom:8px!important}
+  .sheet-section-title{font-size:9pt!important;margin:0!important}
 }
 
 /* ===== Responsive ===== */
@@ -680,7 +724,7 @@ function smartCompress(text,maxLen){
   return result.join('；')+'...(等)';
 }
 
-// 【核心重构】实施单页面，完全对齐用户要求
+// 【核心重构】实施单页面，完全对齐用户排版要求
 function renderImplSheet(data,proj,emp,recordDays){
   const area=$('implArea');
   const summaryHtml=formatSummaryList(data.work_summary);
@@ -694,74 +738,85 @@ function renderImplSheet(data,proj,emp,recordDays){
       '<button class="btn btn-primary" onclick="updateImpl()">更新实施单</button>'+
     '</div>'+
     '<div id="printWrap">'+
-      // 实施单
-      '<div class="card implement-sheet" id="implSheet">'+
+      '<div class="card implement-sheet print-page-break" id="implSheet">'+
         '<div class="sheet-title">实施服务确认单</div>'+
         '<div class="sheet-subtitle no-print">本月应出勤天数：'+proj.work_days_month+' 天</div>'+
         
-        '<table class="sheet-table">'+
-          '<tr><th style="width:12%">甲方</th><td style="width:38%;text-align:center;">'+esc(proj.party_a)+'</td><th style="width:12%">乙方</th><td style="width:38%;text-align:center;">'+esc(proj.party_b)+'</td></tr>'+
-          '<tr><th>服务项目</th><td style="text-align:center;">'+esc(proj.project_name)+'</td><th>起止日期</th><td style="text-align:center;">'+data.start_date+' 至 '+data.end_date+'</td></tr>'+
+        // 项目信息表
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><th style="width:12%;text-align:center;">甲方</th><td style="width:38%;text-align:center;">'+esc(proj.party_a)+'</td><th style="width:12%;text-align:center;">乙方</th><td style="width:38%;text-align:center;">'+esc(proj.party_b)+'</td></tr>'+
+          '<tr><th style="text-align:center;">服务项目</th><td style="text-align:center;">'+esc(proj.project_name)+'</td><th style="text-align:center;">起止日期</th><td style="text-align:center;">'+data.start_date+' 至 '+data.end_date+'</td></tr>'+
         '</table>'+
         
-        '<div class="sheet-section-title">工作完成情况：</div>'+
-        '<table class="sheet-table">'+
-          '<thead><tr><th style="width:10%">姓名</th><th style="width:12%">角色</th><th style="width:36%">工作完成情况</th><th style="width:12%">单价（元）</th><th style="width:12%">人天数</th><th style="width:18%">小计</th></tr></thead>'+
-          '<tbody>'+
-            '<tr>'+
-              '<td style="text-align:center;">'+esc(emp.name)+'</td>'+
-              '<td style="text-align:center;">'+esc(emp.role)+'</td>'+
-              '<td style="text-align:left;vertical-align:top;">'+summaryHtml+'</td>'+
-              '<td style="text-align:center;">'+proj.unit_price.toFixed(2)+'</td>'+
-              '<td style="text-align:center;">'+data.total_days.toFixed(2)+'</td>'+
-              '<td style="text-align:center;">'+data.total_amount.toFixed(2)+'</td>'+
-            '</tr>'+
-          '</tbody>'+
-        '</table>'+
-        
-        '<table class="sheet-table">'+
-          '<tr><th style="width:58%;text-align:center;">核减金额（元）</th><td style="width:42%;text-align:center;"><input type="number" id="i_deduct" min="0" step="0.01" value="" style="text-align:center;border:none;outline:none;width:100%;font-size:10pt;" placeholder=" "></td></tr>'+
-          '<tr><th style="text-align:center;">实际结算金额（元）</th><td style="text-align:center;font-weight:700;" id="i_final">'+data.total_amount.toFixed(2)+'</td></tr>'+
-        '</table>'+
-        
-        '<div class="sheet-section-title">交付文档：</div>'+
-        '<table class="sheet-table"><tr><td style="height:50px;"></td></tr></table>'+
-        
-        '<div class="sheet-section-title">工作评价</div>'+
-        '<table class="sheet-table">'+
-          '<tr><th style="width:18%;text-align:center;">工作质量</th><td style="text-align:left;vertical-align:top;"><textarea id="i_quality" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.quality)+'</textarea></td></tr>'+
-          '<tr><th style="text-align:center;">工作效率</th><td style="text-align:left;vertical-align:top;"><textarea id="i_efficiency" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.efficiency)+'</textarea></td></tr>'+
-          '<tr><th style="text-align:center;">工作态度</th><td style="text-align:left;vertical-align:top;">'+esc(attitude)+'</td></tr>'+
-          '<tr><th style="text-align:center;">出勤率</th><td style="text-align:center;"><input type="text" value="'+(data.attendance_rate*100).toFixed(1)+'%" readonly style="background:#f9f9f9;border:none;width:100%;text-align:center;font-size:10pt;"></td></tr>'+
-          '<tr><th style="text-align:center;">工作效果</th><td style="text-align:left;vertical-align:top;"><textarea id="i_effect" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.effect)+'</textarea></td></tr>'+
-        '</table>'+
-        
-        '<div class="sheet-section-title">工作签字确认：</div>'+
-        '<table class="sheet-table">'+
-          '<tr><th style="width:50%;text-align:center;">甲方</th><th style="width:50%;text-align:center;">乙方</th></tr>'+
+        // 工作完成情况表（section title嵌入表格第一行，无缝连接）
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><td colspan="6" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">工作完成情况：</td></tr>'+
+          '<tr><th style="width:10%;text-align:center;">姓名</th><th style="width:12%;text-align:center;">角色</th><th style="width:36%;text-align:center;">工作完成情况</th><th style="width:12%;text-align:center;">单价（元）</th><th style="width:12%;text-align:center;">人天数</th><th style="width:18%;text-align:center;">小计</th></tr>'+
           '<tr>'+
-            '<td style="height:80px;text-align:center;vertical-align:middle;">'+
-              '<div style="border:1px solid #000;width:140px;height:60px;display:inline-block;"></div>'+
+            '<td style="text-align:center;vertical-align:middle;">'+esc(emp.name)+'</td>'+
+            '<td style="text-align:center;vertical-align:middle;">'+esc(emp.role)+'</td>'+
+            '<td style="text-align:left;vertical-align:top;"><div id="i_summary_html" style="line-height:1.6;">'+summaryHtml+'</div></td>'+
+            '<td style="text-align:center;vertical-align:middle;">'+proj.unit_price.toFixed(2)+'</td>'+
+            '<td style="text-align:center;vertical-align:middle;">'+data.total_days.toFixed(2)+'</td>'+
+            '<td style="text-align:center;vertical-align:middle;">'+data.total_amount.toFixed(2)+'</td>'+
+          '</tr>'+
+        '</table>'+
+        
+        // 核减金额表（上下排列，与上方6列表格对齐：前3列合并/后3列合并）
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><td colspan="3" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">核减金额（元）</td><td colspan="3" style="border:1px solid #000;text-align:center;"><input type="number" id="i_deduct" min="0" step="0.01" value="" style="text-align:center;border:none;outline:none;width:100%;font-size:10pt;" placeholder=" "></td></tr>'+
+          '<tr><td colspan="3" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">实际结算金额（元）</td><td colspan="3" style="border:1px solid #000;text-align:center;font-weight:700;" id="i_final">'+data.total_amount.toFixed(2)+'</td></tr>'+
+        '</table>'+
+        
+        // 交付文档（空单元格，无输入栏）
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><td colspan="6" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">交付文档：</td></tr>'+
+          '<tr><td colspan="6" style="border:1px solid #000;height:50px;"></td></tr>'+
+        '</table>'+
+        
+        // 工作评价（无副标题，字段靠左垂直居中）
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><td colspan="2" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">工作评价</td></tr>'+
+          '<tr><th style="width:18%;text-align:center;vertical-align:middle;">工作质量</th><td style="text-align:left;vertical-align:middle;"><textarea id="i_quality" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.quality)+'</textarea></td></tr>'+
+          '<tr><th style="text-align:center;vertical-align:middle;">工作效率</th><td style="text-align:left;vertical-align:middle;"><textarea id="i_efficiency" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.efficiency)+'</textarea></td></tr>'+
+          '<tr><th style="text-align:center;vertical-align:middle;">工作态度</th><td style="text-align:left;vertical-align:middle;">'+esc(attitude)+'</td></tr>'+
+          '<tr><th style="text-align:center;vertical-align:middle;">出勤率</th><td style="text-align:center;vertical-align:middle;"><input type="text" value="'+(data.attendance_rate*100).toFixed(1)+'%" readonly style="background:transparent;border:none;width:100%;text-align:center;font-size:10pt;"></td></tr>'+
+          '<tr><th style="text-align:center;vertical-align:middle;">工作效果</th><td style="text-align:left;vertical-align:middle;"><textarea id="i_effect" rows="2" style="border:none;outline:none;width:100%;font-size:10pt;font-family:inherit;resize:none;">'+esc(data.effect)+'</textarea></td></tr>'+
+        '</table>'+
+        
+        // 工作签字确认（左右布局：甲方文字+空框 | 乙方文字+签名）
+        '<table class="sheet-table" style="margin-bottom:0;">'+
+          '<tr><td colspan="2" class="section-row" style="border:1px solid #000;font-weight:600;font-size:10pt;height:14px;line-height:14px;padding:0 4px;">工作签字确认：</td></tr>'+
+          '<tr class="sign-row">'+
+            '<td style="border:1px solid #000;width:50%;vertical-align:middle;">'+
+              '<div style="display:flex;align-items:center;gap:10px;height:60px;padding:4px;">'+
+                '<span style="font-size:10pt;white-space:nowrap;">甲方</span>'+
+                '<div style="border:1px solid #000;width:130px;height:50px;flex-shrink:0;"></div>'+
+              '</div>'+
             '</td>'+
-            '<td style="height:80px;text-align:center;vertical-align:middle;">'+
-              '<div style="width:140px;height:60px;display:inline-flex;align-items:center;justify-content:center;">'+
-                '<img src="'+PARTY_B_SIGNATURE+'" style="max-width:100%;max-height:100%;object-fit:contain;" alt="乙方签名">'+
+            '<td style="border:1px solid #000;width:50%;vertical-align:middle;">'+
+              '<div style="display:flex;align-items:center;gap:10px;height:60px;padding:4px;">'+
+                '<span style="font-size:10pt;white-space:nowrap;">乙方</span>'+
+                '<div style="width:130px;height:50px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">'+
+                  '<img src="'+PARTY_B_SIGNATURE+'" style="max-width:100%;max-height:100%;object-fit:contain;" alt="乙方签名">'+
+                '</div>'+
               '</div>'+
             '</td>'+
           '</tr>'+
         '</table>'+
         
-        '<div style="font-size:8pt;color:#666;margin-top:12px;text-align:left;">本确认单一式贰份，甲方执贰份，乙方执一份，经双方项目经理或授权代表签字后有效。</div>'+
+        // 底部文字靠左
+        '<div style="font-size:8pt;color:#666;margin-top:6px;text-align:left;">本确认单一式贰份，甲方执贰份，乙方执一份，经双方项目经理或授权代表签字后有效。</div>'+
       '</div>'+
     '</div>';
-
+    
   $('i_deduct').addEventListener('input',()=>{const d=parseFloat($('i_deduct').value)||0;$('i_final').textContent=(data.total_amount-d).toFixed(2)});
 }
 
 // 打印实施单
 window.printImplSheet=()=>{window.print();};
 
-// 打印工时表 + 实施单（2张A4）
+// 打印工时表 + 实施单（各一张A4，不跨页）
 window.printTimesheetAndImpl=async()=>{
   if(!implCache||!implCache.currentData){toast('请先生成实施单','error');return;}
   const emp=Object.values(implCache.employees)[implCache.selected];
@@ -782,17 +837,12 @@ window.printTimesheetAndImpl=async()=>{
   const wk=['日','一','二','三','四','五','六'];
   let totalH=0,totalO=0;
   
-  // 生成工时明细表HTML（紧凑A4排版）
-  let tsHtml='<div class="print-page-break" style="padding:20px;font-size:9pt;">';
-  tsHtml+='<div style="text-align:center;font-size:16pt;font-weight:700;margin-bottom:10px;letter-spacing:2px;">工作记录明细表</div>';
-  tsHtml+='<table class="sheet-table" style="margin-bottom:6px;">';
-  tsHtml+='<tr><th style="width:15%;">人员姓名</th><td style="width:35%;text-align:center;">'+esc(emp.name)+'</td><th style="width:15%;">工作单位</th><td style="width:35%;text-align:center;" colspan="2">'+esc(proj.party_b)+'</td></tr>';
-  tsHtml+='<tr><th>服务项目</th><td style="text-align:center;">'+esc(proj.project_name)+'</td><th>技术类型</th><td style="text-align:center;" colspan="2">'+esc(emp.role)+'</td></tr>';
-  tsHtml+='</table>';
-  
-  tsHtml+='<table class="sheet-table">';
-  tsHtml+='<thead><tr><th style="width:15%;text-align:center;">日期</th><th style="width:45%;text-align:center;">工作内容</th><th style="width:13%;text-align:center;">时长H</th><th style="width:13%;text-align:center;">加班时长H</th><th style="width:14%;text-align:center;">备注</th></tr></thead>';
-  tsHtml+='<tbody>';
+  // 生成工时明细表HTML（严格对齐图17格式，紧凑A4排版）
+  let tsHtml='<table class="sheet-table timesheet-detail" style="margin-bottom:0;">';
+  tsHtml+='<tr><td colspan="5" style="text-align:center;font-size:14pt;font-weight:700;border:1px solid #000;letter-spacing:2px;">工作记录明细表</td></tr>';
+  tsHtml+='<tr><th style="width:15%;text-align:center;border:1px solid #000;">人员姓名</th><td style="width:25%;text-align:center;border:1px solid #000;">'+esc(emp.name)+'</td><th style="width:15%;text-align:center;border:1px solid #000;">工作单位</th><td colspan="2" style="width:45%;text-align:center;border:1px solid #000;">'+esc(proj.party_b)+'</td></tr>';
+  tsHtml+='<tr><th style="text-align:center;border:1px solid #000;">服务项目</th><td style="text-align:center;border:1px solid #000;">'+esc(proj.project_name)+'</td><th style="text-align:center;border:1px solid #000;">技术类型</th><td colspan="2" style="text-align:center;border:1px solid #000;">'+esc(emp.role)+'</td></tr>';
+  tsHtml+='<tr><th style="text-align:center;border:1px solid #000;">日期</th><th style="text-align:center;border:1px solid #000;">工作内容</th><th style="text-align:center;border:1px solid #000;">时长H</th><th style="text-align:center;border:1px solid #000;">加班时长H</th><th style="text-align:center;border:1px solid #000;">备注</th></tr>';
   
   for(let d=1;d<=days;d++){
     const ds=month+'-'+d.toString().padStart(2,'0');
@@ -804,30 +854,41 @@ window.printTimesheetAndImpl=async()=>{
     const o=r?(r.overtime_hours||0):'';
     const rm=r?esc(r.remark):'';
     if(r){totalH+=r.hours||0;totalO+=r.overtime_hours||0;}
-    tsHtml+='<tr><td style="text-align:center;">'+ds+'</td><td>'+content+'</td><td style="text-align:center;">'+h+'</td><td style="text-align:center;">'+o+'</td><td>'+rm+'</td></tr>';
+    // 日期格式 2026/3/1（不补零，与Excel一致）
+    const dsSlash=y+'/'+m+'/'+d;
+    tsHtml+='<tr><td style="text-align:center;border:1px solid #000;">'+dsSlash+'</td><td style="border:1px solid #000;">'+content+'</td><td style="text-align:center;border:1px solid #000;">'+h+'</td><td style="text-align:center;border:1px solid #000;">'+o+'</td><td style="border:1px solid #000;">'+rm+'</td></tr>';
   }
   
-  tsHtml+='<tr><th colspan="2" style="text-align:center;">合计工时</th><td style="text-align:center;">'+totalH.toFixed(2)+'</td><td style="text-align:center;">'+totalO.toFixed(2)+'</td><td></td></tr>';
-  tsHtml+='<tr><th colspan="2" style="text-align:center;">合计人天</th><td style="text-align:center;">'+(totalH/8).toFixed(2)+'</td><td style="text-align:center;">'+(totalO/8).toFixed(2)+'</td><td></td></tr>';
-  tsHtml+='</tbody></table>';
-  tsHtml+='</div>';
+  tsHtml+='<tr><td colspan="2" style="text-align:center;font-weight:600;border:1px solid #000;">合计工时</td><td style="text-align:center;border:1px solid #000;">'+totalH.toFixed(2)+'</td><td style="text-align:center;border:1px solid #000;">'+totalO.toFixed(2)+'</td><td style="border:1px solid #000;"></td></tr>';
+  tsHtml+='<tr><td colspan="2" style="text-align:center;font-weight:600;border:1px solid #000;">合计人天</td><td style="text-align:center;border:1px solid #000;">'+(totalH/8).toFixed(2)+'</td><td style="text-align:center;border:1px solid #000;">'+(totalO/8).toFixed(2)+'</td><td style="border:1px solid #000;"></td></tr>';
+  tsHtml+='</table>';
   
-  // 插入工时表到实施单前面
+  // 插入工时表到实施单前面，分别占一页A4
   const printWrap=$('printWrap');
   const implSheet=$('implSheet');
   if(implSheet&&printWrap){
-    implSheet.insertAdjacentHTML('beforebegin',tsHtml);
+    const tsDiv=document.createElement('div');
+    tsDiv.className='print-page-break';
+    tsDiv.style.padding='5mm';
+    tsDiv.innerHTML=tsHtml;
+    printWrap.insertBefore(tsDiv,implSheet);
+    implSheet.classList.add('print-page-break');
+    implSheet.style.padding='5mm';
+    
     window.print();
-    // 打印后移除工时表
-    const tsEl=printWrap.querySelector('.print-page-break');
-    if(tsEl)tsEl.remove();
+    
+    // 打印后清理
+    implSheet.classList.remove('print-page-break');
+    implSheet.style.padding='';
+    tsDiv.remove();
   }
 };
 
 window.updateImpl=async()=>{
   if(!implCache||!implCache.currentData)return;
   const d=implCache.currentData;const proj=implCache.project;
-  const updateBody={work_summary:$('i_quality').parentElement.parentElement.parentElement.querySelector('td').innerText,deduction:parseFloat($('i_deduct').value)||null,final_amount:parseFloat($('i_final').textContent)||d.total_amount,quality:$('i_quality').value,efficiency:$('i_efficiency').value,attitude:d.attitude,effect:$('i_effect').value};
+  const summary=$('i_summary_html')?$('i_summary_html').innerText:d.work_summary;
+  const updateBody={work_summary:summary,deduction:parseFloat($('i_deduct').value)||null,final_amount:parseFloat($('i_final').textContent)||d.total_amount,quality:$('i_quality').value,efficiency:$('i_efficiency').value,attitude:d.attitude,effect:$('i_effect').value};
   try{
     await db.patch('implementations',updateBody,{project_id:'eq.'+proj.id,employee_name:'eq.'+d.employee_name,month:'eq.'+d.month});
     toast('实施单更新成功','success')
@@ -842,7 +903,8 @@ window.exportImplExcel=()=>{
     wsData.push(['服务项目',implCache.project.project_name,'','起止日期',($('implSheet').querySelectorAll('td')[3]?.textContent||'')]);
     wsData.push(['工作完成情况：']);wsData.push(['姓名','角色','工作完成情况','单价(元)','人天数','小计']);
     const d=implCache.currentData;const e=Object.values(implCache.employees)[implCache.selected];
-    wsData.push([e.name,e.role,$('i_quality').parentElement.parentElement.parentElement.querySelector('td').innerText,implCache.project.unit_price,d.total_days,d.total_amount]);
+    const summary=$('i_summary_html')?$('i_summary_html').innerText:d.work_summary;
+    wsData.push([e.name,e.role,summary,implCache.project.unit_price,d.total_days,d.total_amount]);
     wsData.push(['核减金额(元)',parseFloat($('i_deduct').value)||'','','实际结算金额(元)',parseFloat($('i_final').textContent)||d.total_amount]);
     wsData.push(['交付文档']);wsData.push(['']);
     wsData.push(['工作评价']);wsData.push(['工作质量',$('i_quality').value]);
